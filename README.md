@@ -7,7 +7,9 @@ Browse artists, explore trackers era by era and listen to tracks right from your
 
 ## Features
 
-- **Artist grid**: 580+ artists with photos, instant search and filters (All, ♥ Favorites, ★ Recommended, Updated).
+- **Artist grid**: 580+ artists with photos and instant search.
+- **Bottom navigation**: a floating "liquid glass" tab bar (Artists, Top, Updated, Favorites) within thumb reach, with a glass mini-player above it.
+- **Device language**: the interface follows the phone's language (English, Italiano, Español, Français, Deutsch, Português; English is the fallback).
 - **Full trackers**: every tab (Unreleased, Released, Recent, Best Of, Stems…), with eras, cover art, descriptions and stats.
 - **Track details**: quality, available length, leak date, credits, notes and links.
 - **Track search**: search the whole tracker by title, notes or era, with *Playable*, *Full* and *Snippet* filters.

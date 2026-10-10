@@ -16,6 +16,117 @@ const state = {
   qIndex: -1,
 };
 
+// ---------- i18n (follows the device language) ----------
+const I18N = {
+  en: {
+    back: "Back", prev: "Previous", next: "Next", playPause: "Play/Pause", favorite: "Favorite", play: "Play",
+    tabAll: "Artists", tabBest: "Top", tabUpdated: "Updated", tabFav: "Favorites",
+    titleBest: "Recommended", titleUpdated: "Recently updated",
+    favAdded: "Added to favorites", favRemoved: "Removed from favorites", retry: "Retry",
+    artistsOffline: "Artist list offline (saved copy)", loadingArtists: "Loading artists…",
+    artistsError: "Couldn't load the artist list.", searchArtist: "Search artists…",
+    nArtists: ["{n} artist", "{n} artists"], noFavs: "No favorites yet: open an artist and tap ♥.", noResults: "No results.",
+    artistNotFound: "Artist not found.", loadingTracker: "Loading tracker…",
+    trackerError: "Couldn't load the tracker. Check your connection.", trackerOffline: "Offline: cached tracker",
+    nTracks: ["{n} track", "{n} tracks"], nEras: ["{n} era", "{n} eras"], updatedOn: "upd. {d}", trackerBy: "Tracker by {c}",
+    searchTracks: ["Search {n} track…", "Search {n} tracks…"],
+    fAll: "All", fPlay: "▶ Playable", fFull: "Full", fSnippet: "Snippet",
+    emptyTab: "No data in this tab.", noTracks: "No tracks.", nResults: ["{n} result", "{n} results"],
+    showMore: "Show more ({n})", cantPlay: "Can't play this track", audioError: "Error loading audio",
+  },
+  it: {
+    back: "Indietro", prev: "Precedente", next: "Successivo", playPause: "Play/Pausa", favorite: "Preferito", play: "Riproduci",
+    tabAll: "Artisti", tabBest: "Top", tabUpdated: "Recenti", tabFav: "Preferiti",
+    titleBest: "Consigliati", titleUpdated: "Aggiornati di recente",
+    favAdded: "Aggiunto ai preferiti", favRemoved: "Rimosso dai preferiti", retry: "Riprova",
+    artistsOffline: "Lista artisti offline (copia salvata)", loadingArtists: "Carico gli artisti…",
+    artistsError: "Impossibile caricare la lista artisti.", searchArtist: "Cerca un artista…",
+    nArtists: ["{n} artista", "{n} artisti"], noFavs: "Nessun preferito: apri un artista e tocca ♥.", noResults: "Nessun risultato.",
+    artistNotFound: "Artista non trovato.", loadingTracker: "Carico il tracker…",
+    trackerError: "Impossibile caricare il tracker. Controlla la connessione.", trackerOffline: "Offline: tracker in cache",
+    nTracks: ["{n} brano", "{n} brani"], nEras: ["{n} era", "{n} ere"], updatedOn: "agg. {d}", trackerBy: "Tracker di {c}",
+    searchTracks: ["Cerca in {n} brano…", "Cerca in {n} brani…"],
+    fAll: "Tutti", fPlay: "▶ Ascoltabili", fFull: "Full", fSnippet: "Snippet",
+    emptyTab: "Nessun dato in questa scheda.", noTracks: "Nessun brano.", nResults: ["{n} risultato", "{n} risultati"],
+    showMore: "Mostra altri ({n})", cantPlay: "Impossibile riprodurre questo brano", audioError: "Errore nel caricamento audio",
+  },
+  es: {
+    back: "Atrás", prev: "Anterior", next: "Siguiente", playPause: "Reproducir/Pausa", favorite: "Favorito", play: "Reproducir",
+    tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recientes", tabFav: "Favoritos",
+    titleBest: "Recomendados", titleUpdated: "Actualizados",
+    favAdded: "Añadido a favoritos", favRemoved: "Eliminado de favoritos", retry: "Reintentar",
+    artistsOffline: "Lista de artistas sin conexión (copia guardada)", loadingArtists: "Cargando artistas…",
+    artistsError: "No se pudo cargar la lista de artistas.", searchArtist: "Buscar artistas…",
+    nArtists: ["{n} artista", "{n} artistas"], noFavs: "Aún no hay favoritos: abre un artista y toca ♥.", noResults: "Sin resultados.",
+    artistNotFound: "Artista no encontrado.", loadingTracker: "Cargando tracker…",
+    trackerError: "No se pudo cargar el tracker. Revisa tu conexión.", trackerOffline: "Sin conexión: tracker en caché",
+    nTracks: ["{n} canción", "{n} canciones"], nEras: ["{n} era", "{n} eras"], updatedOn: "act. {d}", trackerBy: "Tracker de {c}",
+    searchTracks: ["Buscar en {n} canción…", "Buscar en {n} canciones…"],
+    fAll: "Todo", fPlay: "▶ Reproducibles", fFull: "Full", fSnippet: "Snippet",
+    emptyTab: "No hay datos en esta pestaña.", noTracks: "No hay canciones.", nResults: ["{n} resultado", "{n} resultados"],
+    showMore: "Mostrar más ({n})", cantPlay: "No se puede reproducir esta canción", audioError: "Error al cargar el audio",
+  },
+  fr: {
+    back: "Retour", prev: "Précédent", next: "Suivant", playPause: "Lecture/Pause", favorite: "Favori", play: "Lire",
+    tabAll: "Artistes", tabBest: "Top", tabUpdated: "Récents", tabFav: "Favoris",
+    titleBest: "Recommandés", titleUpdated: "Mis à jour",
+    favAdded: "Ajouté aux favoris", favRemoved: "Retiré des favoris", retry: "Réessayer",
+    artistsOffline: "Liste des artistes hors ligne (copie enregistrée)", loadingArtists: "Chargement des artistes…",
+    artistsError: "Impossible de charger la liste des artistes.", searchArtist: "Rechercher un artiste…",
+    nArtists: ["{n} artiste", "{n} artistes"], noFavs: "Aucun favori : ouvrez un artiste et touchez ♥.", noResults: "Aucun résultat.",
+    artistNotFound: "Artiste introuvable.", loadingTracker: "Chargement du tracker…",
+    trackerError: "Impossible de charger le tracker. Vérifiez votre connexion.", trackerOffline: "Hors ligne : tracker en cache",
+    nTracks: ["{n} titre", "{n} titres"], nEras: ["{n} ère", "{n} ères"], updatedOn: "maj {d}", trackerBy: "Tracker par {c}",
+    searchTracks: ["Rechercher dans {n} titre…", "Rechercher dans {n} titres…"],
+    fAll: "Tout", fPlay: "▶ Écoutables", fFull: "Full", fSnippet: "Snippet",
+    emptyTab: "Aucune donnée dans cet onglet.", noTracks: "Aucun titre.", nResults: ["{n} résultat", "{n} résultats"],
+    showMore: "Afficher plus ({n})", cantPlay: "Impossible de lire ce titre", audioError: "Erreur de chargement audio",
+  },
+  de: {
+    back: "Zurück", prev: "Zurück", next: "Weiter", playPause: "Wiedergabe/Pause", favorite: "Favorit", play: "Abspielen",
+    tabAll: "Künstler", tabBest: "Top", tabUpdated: "Neu", tabFav: "Favoriten",
+    titleBest: "Empfohlen", titleUpdated: "Kürzlich aktualisiert",
+    favAdded: "Zu Favoriten hinzugefügt", favRemoved: "Aus Favoriten entfernt", retry: "Erneut versuchen",
+    artistsOffline: "Künstlerliste offline (gespeicherte Kopie)", loadingArtists: "Künstler werden geladen…",
+    artistsError: "Künstlerliste konnte nicht geladen werden.", searchArtist: "Künstler suchen…",
+    nArtists: ["{n} Künstler", "{n} Künstler"], noFavs: "Noch keine Favoriten: Öffne einen Künstler und tippe auf ♥.", noResults: "Keine Ergebnisse.",
+    artistNotFound: "Künstler nicht gefunden.", loadingTracker: "Tracker wird geladen…",
+    trackerError: "Tracker konnte nicht geladen werden. Prüfe deine Verbindung.", trackerOffline: "Offline: Tracker aus dem Cache",
+    nTracks: ["{n} Titel", "{n} Titel"], nEras: ["{n} Ära", "{n} Ären"], updatedOn: "akt. {d}", trackerBy: "Tracker von {c}",
+    searchTracks: ["{n} Titel durchsuchen…", "{n} Titel durchsuchen…"],
+    fAll: "Alle", fPlay: "▶ Abspielbar", fFull: "Full", fSnippet: "Snippet",
+    emptyTab: "Keine Daten in diesem Tab.", noTracks: "Keine Titel.", nResults: ["{n} Ergebnis", "{n} Ergebnisse"],
+    showMore: "Mehr anzeigen ({n})", cantPlay: "Dieser Titel kann nicht abgespielt werden", audioError: "Fehler beim Laden des Audios",
+  },
+  pt: {
+    back: "Voltar", prev: "Anterior", next: "Próxima", playPause: "Reproduzir/Pausar", favorite: "Favorito", play: "Reproduzir",
+    tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recentes", tabFav: "Favoritos",
+    titleBest: "Recomendados", titleUpdated: "Atualizados",
+    favAdded: "Adicionado aos favoritos", favRemoved: "Removido dos favoritos", retry: "Tentar novamente",
+    artistsOffline: "Lista de artistas offline (cópia salva)", loadingArtists: "Carregando artistas…",
+    artistsError: "Não foi possível carregar a lista de artistas.", searchArtist: "Buscar artistas…",
+    nArtists: ["{n} artista", "{n} artistas"], noFavs: "Nenhum favorito: abra um artista e toque em ♥.", noResults: "Nenhum resultado.",
+    artistNotFound: "Artista não encontrado.", loadingTracker: "Carregando tracker…",
+    trackerError: "Não foi possível carregar o tracker. Verifique a conexão.", trackerOffline: "Offline: tracker em cache",
+    nTracks: ["{n} faixa", "{n} faixas"], nEras: ["{n} era", "{n} eras"], updatedOn: "atual. {d}", trackerBy: "Tracker de {c}",
+    searchTracks: ["Buscar em {n} faixa…", "Buscar em {n} faixas…"],
+    fAll: "Tudo", fPlay: "▶ Reproduzíveis", fFull: "Full", fSnippet: "Snippet",
+    emptyTab: "Sem dados nesta aba.", noTracks: "Nenhuma faixa.", nResults: ["{n} resultado", "{n} resultados"],
+    showMore: "Mostrar mais ({n})", cantPlay: "Não foi possível reproduzir esta faixa", audioError: "Erro ao carregar o áudio",
+  },
+};
+const LOCALE = (navigator.languages && navigator.languages[0]) || navigator.language || "en";
+const LANG = I18N[LOCALE.slice(0, 2).toLowerCase()] ? LOCALE.slice(0, 2).toLowerCase() : "en";
+const plural = new Intl.PluralRules(LANG);
+function L(key, vars = {}) {
+  let s = I18N[LANG][key] ?? I18N.en[key] ?? key;
+  if (Array.isArray(s)) s = s[plural.select(vars.n ?? 0) === "one" ? 0 : 1];
+  return s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+}
+document.documentElement.lang = LANG;
+document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = L(el.dataset.i18n)));
+document.querySelectorAll("[data-i18n-aria]").forEach((el) => el.setAttribute("aria-label", L(el.dataset.i18nAria)));
+
 // ---------- utils ----------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const slugImg = (name) => ASSETS + name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".webp";
@@ -110,24 +221,40 @@ function playableUrl(track) {
   return null;
 }
 
-// ---------- header ----------
-function setHeader({ title, back, fav }) {
-  $("#title").textContent = title;
-  $("#back").hidden = !back;
-  const f = $("#fav-toggle");
-  f.hidden = !fav;
-  if (fav) f.classList.toggle("on", favs.has(fav));
-  f.onclick = () => {
-    favs.has(fav) ? favs.delete(fav) : favs.add(fav);
-    saveFavs(); f.classList.toggle("on", favs.has(fav));
-    toast(favs.has(fav) ? "Aggiunto ai preferiti" : "Rimosso dai preferiti");
-  };
+// ---------- chrome: bottom dock ----------
+const HOME_TITLES = { all: "ArtistGrid", best: "titleBest", updated: "titleUpdated", fav: "tabFav" };
+const FILTER_ROUTES = { all: "#/", best: "#/best", updated: "#/updated", fav: "#/fav" };
+
+function setChrome({ artist }) {
+  document.body.classList.toggle("in-artist", !!artist);
+  document.querySelectorAll("#tabs-bar .tab").forEach((b) => b.classList.toggle("on", b.dataset.f === state.filter));
+  moveLens();
 }
+
+// Slides the glass lens under the active tab.
+function moveLens() {
+  const on = $("#tabs-bar .tab.on"), lens = $("#lens");
+  if (!on) return;
+  lens.style.width = on.offsetWidth + "px";
+  lens.style.transform = `translateX(${on.offsetLeft}px)`;
+  requestAnimationFrame(() => lens.classList.add("ready"));
+}
+// the bar resizes while the back button animates in/out
+new ResizeObserver(moveLens).observe($("#tabs-bar"));
+
+$("#tabs-bar").onclick = (e) => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  const target = FILTER_ROUTES[b.dataset.f];
+  if (location.hash === target || (!location.hash && target === "#/")) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  // switching tabs on the home replaces history so Back leaves the app instead of cycling tabs
+  if (!document.body.classList.contains("in-artist")) location.replace(target);
+  else location.hash = target;
+};
 $("#back").onclick = () => (history.length > 1 ? history.back() : (location.hash = "#/"));
 
 function loading(msg) { view.innerHTML = `<div class="state"><div class="spinner"></div>${esc(msg)}</div>`; }
 function errorView(msg, retry) {
-  view.innerHTML = `<div class="state">${esc(msg)}<br><button class="btn" id="retry">Riprova</button></div>`;
+  view.innerHTML = `<div class="state">${esc(msg)}<br><button class="btn" id="retry">${esc(L("retry"))}</button></div>`;
   $("#retry").onclick = retry;
 }
 
@@ -144,34 +271,29 @@ async function loadArtists() {
     // fall back to the last cached copy, then to the snapshot bundled in the APK
     text = store("artists_csv") || (await fetch("artists.csv").then((r) => r.text()).catch(() => null));
     if (!text) throw new Error("offline");
-    toast("Lista artisti offline (copia salvata)");
+    toast(L("artistsOffline"));
   }
   state.artists = parseCsv(text).map((a, i) => ({ ...a, idx: i, key: norm(a.name) }));
 }
 
-async function renderHome() {
-  setHeader({ title: "ArtistGrid" });
+async function renderHome(filter = "all") {
+  state.filter = filter;
+  setChrome({ artist: false });
   if (!state.artists.length) {
-    loading("Carico gli artisti…");
+    loading(L("loadingArtists"));
     try { await loadArtists(); }
-    catch { return errorView("Impossibile caricare la lista artisti.", renderHome); }
+    catch { return errorView(L("artistsError"), () => renderHome(filter)); }
   }
+  const title = HOME_TITLES[filter] === "ArtistGrid" ? "ArtistGrid" : L(HOME_TITLES[filter]);
   view.innerHTML = `
-    <input class="search" id="q" type="search" placeholder="Cerca un artista…" value="${esc(state.query)}" autocomplete="off" />
-    <div class="chips" id="chips">
-      ${[["all", "Tutti"], ["fav", "♥ Preferiti"], ["best", "★ Consigliati"], ["updated", "Aggiornati"]]
-        .map(([k, l]) => `<button class="chip ${state.filter === k ? "on" : ""}" data-f="${k}">${l}</button>`).join("")}
+    <div class="page-head"><h1>${esc(title)}</h1><span class="count" id="count"></span></div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input class="search" id="q" type="search" placeholder="${esc(L("searchArtist"))}" value="${esc(state.query)}" autocomplete="off" />
     </div>
-    <div class="count" id="count"></div>
-    <div class="grid" id="grid"></div>`;
+    <div class="grid" id="grid" style="margin-top:14px"></div>`;
   const q = $("#q");
   q.oninput = () => { state.query = q.value; drawGrid(); };
-  $("#chips").onclick = (e) => {
-    const b = e.target.closest(".chip"); if (!b) return;
-    state.filter = b.dataset.f;
-    $("#chips").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c === b));
-    drawGrid();
-  };
   $("#grid").onclick = (e) => {
     const c = e.target.closest(".card"); if (!c) return;
     const a = state.artists[c.dataset.i];
@@ -179,6 +301,7 @@ async function renderHome() {
     else openExternal(/^https?:/.test(a.url) ? a.url : "https://" + a.url);
   };
   drawGrid();
+  if (state.homeScroll?.filter === filter) window.scrollTo(0, state.homeScroll.y);
 }
 
 function drawGrid() {
@@ -190,7 +313,7 @@ function drawGrid() {
     if (state.filter === "updated") return a.updated === "1";
     return true;
   });
-  $("#count").textContent = `${list.length} artisti`;
+  $("#count").textContent = L("nArtists", { n: list.length });
   $("#grid").innerHTML = list.length ? list.map((a) => `
     <button class="card" data-i="${a.idx}">
       <div class="ph">${esc(a.name[0] || "?")}</div>
@@ -202,22 +325,23 @@ function drawGrid() {
       </div>
       <div class="name">${esc(a.name)}</div>
     </button>`).join("")
-    : `<div class="state" style="grid-column:1/-1">${state.filter === "fav" ? "Nessun preferito: apri un artista e tocca ♥." : "Nessun risultato."}</div>`;
+    : `<div class="state" style="grid-column:1/-1">${esc(state.filter === "fav" && !qn ? L("noFavs") : L("noResults"))}</div>`;
 }
 
 // ---------- artist / tracker ----------
 async function renderArtist(name, tabSlug) {
+  setChrome({ artist: true });
   try { await loadArtists(); } catch {}
   const a = state.artists.find((x) => x.name === name);
-  if (!a) { setHeader({ title: name, back: true }); return errorView("Artista non trovato.", () => route()); }
-  setHeader({ title: a.name, back: true, fav: a.name });
-  loading("Carico il tracker…");
+  if (!a) return errorView(L("artistNotFound"), () => route());
+  state.artistName = a.name;
+  loading(L("loadingTracker"));
 
   const path = tabSlug ? `/sh/${a.url}/tab/${encodeURIComponent(tabSlug)}` : `/sh/${a.url}/`;
   let res;
   try { res = await cachedJson(TRACKER_API + path, "t:" + a.url + ":" + (tabSlug || "")); }
-  catch { return errorView("Impossibile caricare il tracker. Controlla la connessione.", () => renderArtist(name, tabSlug)); }
-  if (res.offline) toast("Offline: tracker in cache");
+  catch { return errorView(L("trackerError"), () => renderArtist(name, tabSlug)); }
+  if (res.offline) toast(L("trackerOffline"));
 
   const d = res.data;
   state.tracker = d;
@@ -225,7 +349,7 @@ async function renderArtist(name, tabSlug) {
   const all = [];
   for (const e of eras) for (const t of e.tracks) all.push({ t, e });
   const curTab = d.tab?.slug || tabSlug || "main";
-  const updated = d.last_updated ? new Date(d.last_updated * 1000).toLocaleDateString("it-IT") : "";
+  const updated = d.last_updated ? new Date(d.last_updated * 1000).toLocaleDateString(LOCALE) : "";
   const credits = Array.isArray(d.credits) ? d.credits.join(", ") : (d.credits || a.credit);
 
   view.innerHTML = `
@@ -233,9 +357,12 @@ async function renderArtist(name, tabSlug) {
       <img src="${slugImg(a.name)}" alt="" onerror="this.style.visibility='hidden'" />
       <div class="info">
         <h2>${esc(a.name)}</h2>
-        <p>${all.length} brani · ${eras.length} ere${updated ? " · agg. " + updated : ""}</p>
-        ${credits ? `<p>Tracker di ${esc(credits)}</p>` : ""}
+        <p>${L("nTracks", { n: all.length })} · ${L("nEras", { n: eras.length })}${updated ? " · " + L("updatedOn", { d: updated }) : ""}</p>
+        ${credits ? `<p>${esc(L("trackerBy", { c: credits }))}</p>` : ""}
       </div>
+      <button id="fav-toggle" class="icon-btn round ${favs.has(a.name) ? "on" : ""}" aria-label="${esc(L("favorite"))}">
+        <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg>
+      </button>
     </div>
     <div class="links-row">
       <a class="pill-link" href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit" target="_blank" rel="noopener">Google Sheet ↗</a>
@@ -245,12 +372,24 @@ async function renderArtist(name, tabSlug) {
       ${(d.tabs || []).filter((t, i, arr) => arr.findIndex((x) => x.slug === t.slug) === i && !["key", "template"].includes(t.slug))
         .map((t) => `<button class="chip ${t.slug === curTab ? "on" : ""}" data-s="${esc(t.slug)}">${esc(t.name)}</button>`).join("")}
     </div>
-    <input class="search" id="tq" type="search" placeholder="Cerca in ${all.length} brani…" autocomplete="off" />
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input class="search" id="tq" type="search" placeholder="${esc(L("searchTracks", { n: all.length }))}" autocomplete="off" />
+    </div>
     <div class="chips" id="tf">
-      ${[["all", "Tutti"], ["play", "▶ Ascoltabili"], ["full", "Full"], ["snippet", "Snippet"]]
+      ${[["all", L("fAll")], ["play", L("fPlay")], ["full", L("fFull")], ["snippet", L("fSnippet")]]
         .map(([k, l], i) => `<button class="chip ${i ? "" : "on"}" data-f="${k}">${l}</button>`).join("")}
     </div>
     <div id="list"></div>`;
+
+  const fav = $("#fav-toggle");
+  fav.onclick = () => {
+    favs.has(a.name) ? favs.delete(a.name) : favs.add(a.name);
+    saveFavs();
+    fav.classList.toggle("on", favs.has(a.name));
+    fav.classList.remove("pop"); void fav.offsetWidth; fav.classList.add("pop");
+    toast(L(favs.has(a.name) ? "favAdded" : "favRemoved"));
+  };
 
   // keep the selected tab visible
   $("#tabs .chip.on")?.scrollIntoView({ inline: "center", block: "nearest" });
@@ -272,7 +411,7 @@ async function renderArtist(name, tabSlug) {
   const list = $("#list");
   const draw = () => {
     if (!tq && tf === "all") {
-      list.innerHTML = eras.map((e) => eraHtml(e)).join("") || `<div class="state">Nessun dato in questa scheda.</div>`;
+      list.innerHTML = eras.map((e) => eraHtml(e)).join("") || `<div class="state">${esc(L("emptyTab"))}</div>`;
       return;
     }
     const res = all.filter(matches);
@@ -295,7 +434,7 @@ async function renderArtist(name, tabSlug) {
       if (el.classList.contains("open") && !body.dataset.ready) {
         body.dataset.ready = "1";
         body.innerHTML = (e.description ? `<div class="era-desc">${esc(e.description)}</div>` : "") +
-          (e.tracks.length ? "" : `<div class="state">Nessun brano.</div>`);
+          (e.tracks.length ? "" : `<div class="state">${esc(L("noTracks"))}</div>`);
         appendTracks(body, e.tracks.map((t) => ({ t, e })), false);
       }
       return;
@@ -319,7 +458,7 @@ function eraHtml(e) {
     <div class="era" data-e="${e.i}">
       <button class="era-head">
         ${e.cover_art ? `<img loading="lazy" src="${esc(e.cover_art)}" alt="" onerror="this.style.visibility='hidden'" />` : `<img alt="" style="background:${esc(e.color || "#1a1a1c")}" />`}
-        <div class="t"><b>${esc(e.name)}</b><span>${e.tracks.length} brani${sum ? " · " + sum : ""}</span></div>
+        <div class="t"><b>${esc(e.name)}</b><span>${L("nTracks", { n: e.tracks.length })}${sum ? " · " + sum : ""}</span></div>
         <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>
       <div class="era-body"></div>
@@ -327,7 +466,7 @@ function eraHtml(e) {
 }
 
 function renderFlat(list, items) {
-  list.innerHTML = `<div class="count">${items.length} risultati</div><div class="era open"><div class="era-body" data-ready="1"></div></div>`;
+  list.innerHTML = `<div class="count">${L("nResults", { n: items.length })}</div><div class="era open"><div class="era-body" data-ready="1"></div></div>`;
   appendTracks(list.querySelector(".era-body"), items, true);
 }
 
@@ -341,7 +480,7 @@ function appendTracks(container, items, showEra, from = 0) {
   if (from + PAGE < items.length) {
     const m = document.createElement("button");
     m.className = "more";
-    m.textContent = `Mostra altri (${items.length - from - PAGE})`;
+    m.textContent = L("showMore", { n: items.length - from - PAGE });
     m._next = () => appendTracks(container, items, showEra, from + PAGE);
     container.appendChild(m);
   }
@@ -372,7 +511,7 @@ function trackEl(item, showEra) {
   ].filter(Boolean).join("");
   const links = (t.links || []).filter((l) => l.url).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.text || l.url)}</a>`).join("");
   el.innerHTML = `
-    <button class="play ${cur() && cur().t === t ? "on" : ""}" ${playable ? "" : "disabled"} aria-label="Riproduci">
+    <button class="play ${cur() && cur().t === t ? "on" : ""}" ${playable ? "" : "disabled"} aria-label="${esc(L("play"))}">
       <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>
     </button>
     <div class="body">
@@ -391,7 +530,8 @@ const audio = $("#audio");
 const cur = () => state.queue[state.qIndex];
 
 function playItem(item, container) {
-  const items = (container?._items || [item]).filter((x) => playableUrl(x.t));
+  const items = (container?._items || [item]).filter((x) => playableUrl(x.t)).map((x) => ({ ...x, artist: state.artistName }));
+  item = items.find((x) => x.t === item.t);
   state.queue = items;
   state.qIndex = Math.max(0, items.indexOf(item));
   startCurrent();
@@ -402,10 +542,11 @@ function startCurrent() {
   const { t, e } = it;
   const title = t.name?.title ?? t.name?.raw ?? "";
   audio.src = playableUrl(t);
-  audio.play().catch(() => toast("Impossibile riprodurre questo brano"));
+  audio.play().catch(() => toast(L("cantPlay")));
   $("#player").hidden = false;
+  document.body.classList.add("has-player");
   $("#p-title").textContent = title;
-  $("#p-sub").textContent = `${$("#title").textContent} · ${e.name}`;
+  $("#p-sub").textContent = `${it.artist} · ${e.name}`;
   const cover = $("#p-cover");
   cover.src = e.cover_art || "";
   cover.style.visibility = e.cover_art ? "visible" : "hidden";
@@ -438,7 +579,7 @@ audio.ontimeupdate = () => { $("#p-bar").style.width = audio.duration ? (audio.c
 audio.onplay = () => $("#p-play-icon").setAttribute("d", "M7 4h3v16H7zM14 4h3v16h-3z");
 audio.onpause = () => $("#p-play-icon").setAttribute("d", "M7 4l13 8-13 8z");
 audio.onended = () => step(1);
-audio.onerror = () => { if (audio.src) toast("Errore nel caricamento audio"); };
+audio.onerror = () => { if (audio.src) toast(L("audioError")); };
 if ("mediaSession" in navigator) {
   navigator.mediaSession.setActionHandler("play", () => audio.play());
   navigator.mediaSession.setActionHandler("pause", () => audio.pause());
@@ -457,9 +598,10 @@ function openExternal(url) {
 function route() {
   const h = location.hash.replace(/^#\/?/, "");
   const parts = h.split("/").map(decodeURIComponent);
+  if (!document.body.classList.contains("in-artist") && view.querySelector("#grid")) state.homeScroll = { filter: state.filter, y: window.scrollY };
   window.scrollTo(0, 0);
   if (parts[0] === "a" && parts[1]) renderArtist(parts[1], parts[2]);
-  else renderHome();
+  else renderHome(FILTER_ROUTES[parts[0]] ? parts[0] : "all");
 }
 window.addEventListener("hashchange", route);
 route();

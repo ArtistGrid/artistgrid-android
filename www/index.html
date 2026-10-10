@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -8,34 +8,49 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header id="topbar">
-    <button id="back" class="icon-btn" aria-label="Indietro" hidden>
-      <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <h1 id="title">ArtistGrid</h1>
-    <button id="fav-toggle" class="icon-btn" aria-label="Preferito" hidden>
-      <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z"/></svg>
-    </button>
-  </header>
-
   <main id="view"></main>
 
-  <div id="player" hidden>
-    <div id="p-progress"><div id="p-bar"></div></div>
+  <div id="player" class="glass" hidden>
     <div class="p-row">
       <img id="p-cover" alt="" />
       <div class="p-meta">
         <div id="p-title"></div>
         <div id="p-sub"></div>
       </div>
-      <button id="p-prev" class="icon-btn" aria-label="Precedente"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
-      <button id="p-play" class="icon-btn big" aria-label="Play/Pausa"><svg viewBox="0 0 24 24"><path id="p-play-icon" d="M7 4l13 8-13 8z"/></svg></button>
-      <button id="p-next" class="icon-btn" aria-label="Successivo"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+      <button id="p-prev" class="icon-btn" data-i18n-aria="prev"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
+      <button id="p-play" class="icon-btn big" data-i18n-aria="playPause"><svg viewBox="0 0 24 24"><path id="p-play-icon" d="M7 4l13 8-13 8z"/></svg></button>
+      <button id="p-next" class="icon-btn" data-i18n-aria="next"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
     </div>
+    <div id="p-progress"><div id="p-bar"></div></div>
     <audio id="audio" preload="none"></audio>
   </div>
 
-  <div id="toast" hidden></div>
+  <nav id="dock">
+    <button id="back" class="glass dock-btn" data-i18n-aria="back">
+      <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div id="tabs-bar" class="glass">
+      <span id="lens" aria-hidden="true"></span>
+      <button class="tab" data-f="all">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+        <span data-i18n="tabAll"></span>
+      </button>
+      <button class="tab" data-f="best">
+        <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>
+        <span data-i18n="tabBest"></span>
+      </button>
+      <button class="tab" data-f="updated">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/><path d="M12 8v4l2.5 2"/></svg>
+        <span data-i18n="tabUpdated"></span>
+      </button>
+      <button class="tab" data-f="fav">
+        <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg>
+        <span data-i18n="tabFav"></span>
+      </button>
+    </div>
+  </nav>
+
+  <div id="toast" class="glass" hidden></div>
 
   <script src="app.js"></script>
 </body>
