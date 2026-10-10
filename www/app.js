@@ -189,6 +189,7 @@ function imgTag(urls, lazy = true) {
 }
 function setImg(img, urls) {
   const list = candidates(urls);
+  img._gen = (img._gen || 0) + 1; // invalidates cover lookups still running for the previous image
   img.classList.remove("loaded", "failed");
   img.dataset.next = list.slice(1).map(encodeURIComponent).join(" ");
   if (!list.length) { img.removeAttribute("src"); img.classList.add("failed"); }
@@ -202,7 +203,9 @@ function advanceImg(img) {
   const src = decodeURIComponent(next);
   if (!src.startsWith("lookup:")) { img.src = src; return; }
   const [, kind, artist, title] = src.split(":");
+  const gen = img._gen;
   lookupCover(kind, decodeURIComponent(artist), decodeURIComponent(title)).then((url) => {
+    if (img._gen !== gen) return; // the element shows another track by now (player covers are reused)
     if (!url) return advanceImg(img);
     img.dataset.next = [...(NATIVE ? [url] : []).map(encodeURIComponent), ...rest].join(" ");
     img.src = NATIVE ? cachedImg(url) : url;
@@ -923,8 +926,9 @@ function useElement(el) {
   if (audio !== el) { audio.pause(); audio = el; }
 }
 
-function startCurrent(direct = false, autoplay = true) {
+function startCurrent(direct = false, autoplay = true, seek = 0) {
   const it = cur(); if (!it) return;
+  pendingSeek = seek; // a resume point only applies to the track it was saved for
   const { t, e } = it;
   const title = trackTitle(t);
   const url = playableUrl(t);
@@ -983,8 +987,7 @@ function restoreSession() {
   for (const it of s.queue) fillEraCovers(it.artist, [it.e]);
   state.queue = s.queue;
   state.qIndex = 0;
-  pendingSeek = s.position || 0;
-  startCurrent(false, false);
+  startCurrent(false, false, s.position || 0);
 }
 
 // Next track: honours repeat-one (only when a track ends by itself), shuffle and repeat.
@@ -1099,7 +1102,7 @@ for (const el of [audioFx, audioRaw]) {
   el.onerror = () => {
     if (el !== audio || !el.getAttribute("src")) return;
     // the proxy couldn't stream it: retry the same track directly (without the equalizer)
-    if (el === audioFx) startCurrent(true);
+    if (el === audioFx) startCurrent(true, true, pendingSeek);
     else toast(L("cantPlay"));
   };
 }
