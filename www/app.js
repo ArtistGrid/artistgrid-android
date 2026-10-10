@@ -55,7 +55,7 @@ const SPEEDS = [0.75, 1, 1.25, 1.5];
 const DEFAULTS = {
   lang: "auto", eqOn: false, eqPreset: "flat", eqGains: [0, 0, 0, 0, 0],
   autoplay: true, speed: 1, compact: false, reduceMotion: false, autoUpdate: true,
-  theme: "dark", bgPlay: true, shuffle: false, repeat: "off", haptics: true,
+  theme: "dark", uiStyle: "glass", accent: "mono", bgPlay: true, shuffle: false, repeat: "off", haptics: true,
 };
 const settings = { ...DEFAULTS, ...(store("settings") || {}) };
 const saveSettings = () => store("settings", settings);
@@ -847,6 +847,69 @@ const THEME_ICONS = {
   dark: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   light: '<svg viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>',
 };
+
+// ---------- style (Liquid Glass / Material You) + accent colour ----------
+// Accents are hand-picked gradient pairs, tuned separately for the dark and light themes so text
+// on them stays readable: no free colour picker, so no ugly combinations.
+const ACCENTS = {
+  mono: { dark: ["#ffffff", "#e4e4ea"], light: ["#111114", "#2e2e36"] },
+  ocean: { dark: ["#7aa7ff", "#5ce1e6"], light: ["#2d5be3", "#0b7f8c"] },
+  aurora: { dark: ["#b794ff", "#ff8ccf"], light: ["#6a3de8", "#b8277a"] },
+  sunset: { dark: ["#ffb26b", "#ff6f91"], light: ["#cc520c", "#c92a5f"] },
+  mint: { dark: ["#6ee7b7", "#4cc9f0"], light: ["#0b8a60", "#0a6c87"] },
+  gold: { dark: ["#ffd76e", "#ffa45c"], light: ["#9a5d08", "#b3410d"] },
+};
+const UI_STYLES = { glass: "Liquid Glass", material: "Material You" };
+// Material You colours from the wallpaper (Android 12+), when the device has them
+let sysColors = store("sys_colors");
+const accentPair = (key, theme) => (key === "system" ? sysColors?.[theme] : ACCENTS[key]?.[theme]) || ACCENTS.mono[theme];
+const currentAccent = () => (settings.accent === "system" ? (sysColors ? "system" : "mono") : ACCENTS[settings.accent] ? settings.accent : "mono");
+
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const rgba = (h, a) => `rgba(${hexRgb(h).join(",")},${a})`;
+// a·t + b·(1-t), in sRGB
+const mix = (a, b, t) => "#" + hexRgb(a).map((x, i) => Math.round(x * t + hexRgb(b)[i] * (1 - t)).toString(16).padStart(2, "0")).join("");
+
+// Every colour variable for one theme: the accent pair, its glow, and the Material You tonal
+// palette (surfaces faintly tinted with the accent, as Android does with dynamic colour).
+function accentVars(key, theme) {
+  const dark = theme === "dark";
+  const [a1, a2] = accentPair(key, theme);
+  const v = { "--a1": a1, "--a2": a2, "--on-accent": dark ? "#111114" : "#ffffff" };
+  if (key !== "mono") { v["--glow"] = rgba(a1, dark ? 0.2 : 0.16); v["--glow2"] = rgba(a2, dark ? 0.13 : 0.1); }
+  const tone = key === "mono" ? (dark ? "#8c8c99" : "#5c5c6a") : a1;
+  const surfaces = dark ? ["#111113", "#18181b", "#1d1d21", "#232327", "#2b2b31"] : ["#fafafc", "#f3f3f7", "#ededf2", "#e7e7ee", "#e1e1e9"];
+  ["--md-surface", "--md-c-low", "--md-c", "--md-c-high", "--md-c-highest"].forEach((name, i) => (v[name] = mix(tone, surfaces[i], dark ? 0.05 + i * 0.015 : 0.03 + i * 0.015)));
+  v["--md-sec"] = mix(tone, dark ? "#25252a" : "#ececf2", dark ? 0.32 : 0.24);
+  v["--md-on-sec"] = mix(tone, dark ? "#ffffff" : "#111114", dark ? 0.22 : 0.35);
+  v["--md-pri"] = mix(tone, dark ? "#1d1d21" : "#ffffff", dark ? 0.4 : 0.3);
+  v["--md-on-pri"] = mix(tone, dark ? "#ffffff" : "#111114", dark ? 0.2 : 0.4);
+  return v;
+}
+let appliedVars = [];
+function applyAccent(theme) {
+  const root = document.documentElement, key = currentAccent();
+  root.dataset.style = settings.uiStyle === "material" ? "material" : "glass";
+  root.dataset.accent = key;
+  for (const k of appliedVars) root.style.removeProperty(k);
+  const v = accentVars(key, theme);
+  for (const [k, val] of Object.entries(v)) root.style.setProperty(k, val);
+  appliedVars = Object.keys(v);
+  // both themes, read by the inline script in index.html before the first paint
+  store("accent_vars", { dark: accentVars(key, "dark"), light: accentVars(key, "light") });
+  return v;
+}
+async function loadSystemColors() {
+  const c = await native("getSystemColors");
+  const ok = (p) => Array.isArray(p) && p.length === 2 && p.every((x) => /^#[0-9a-f]{6}$/i.test(x));
+  const next = c && ok(c.dark) && ok(c.light) ? { dark: c.dark, light: c.light } : null;
+  if (JSON.stringify(next) === JSON.stringify(sysColors)) return;
+  sysColors = next;
+  store("sys_colors", sysColors);
+  if (settings.accent === "system") applyTheme();
+  if (location.hash === "#/settings") renderSettings();
+}
+
 function applyTheme(animate = false) {
   const t = resolvedTheme(), root = document.documentElement;
   if (animate && !settings.reduceMotion) {
@@ -855,7 +918,8 @@ function applyTheme(animate = false) {
     applyTheme.t = setTimeout(() => root.classList.remove("theme-anim"), 450);
   }
   root.dataset.theme = t;
-  const bg = t === "light" ? "#f2f2f7" : "#000000";
+  const v = applyAccent(t);
+  const bg = settings.uiStyle === "material" ? v["--md-surface"] : t === "light" ? "#f2f2f7" : "#000000";
   $('meta[name="theme-color"]').setAttribute("content", bg);
   native("setBars", { dark: t === "dark", color: bg });
   const btn = $("#theme-btn");
@@ -1390,6 +1454,22 @@ async function renderSettings() {
     <section class="group">
       <h3>${esc(L("appearance"))}</h3>
       <div class="rows">
+        <div class="row col"><span class="lbl">${esc(L("uiStyle"))}</span>
+          <div class="style-pick" id="s-style">
+            ${Object.entries(UI_STYLES).map(([k, n]) => `
+              <button class="style-opt ${settings.uiStyle === k ? "on" : ""}" data-v="${k}" aria-pressed="${settings.uiStyle === k}">
+                <span class="prev prev-${k}" aria-hidden="true"><i></i></span>${esc(n)}
+              </button>`).join("")}
+          </div>
+        </div>
+        <div class="row col"><span class="lbl">${esc(L("accent"))}<small id="s-accent-name">${esc(accentName(currentAccent()))}</small></span>
+          <div class="swatches" id="s-accent">
+            ${[...Object.keys(ACCENTS), ...(sysColors ? ["system"] : [])].map((k) => {
+              const g = (t) => `linear-gradient(135deg, ${accentPair(k, t)[0]}, ${accentPair(k, t)[1]})`;
+              return `<button class="swatch ${currentAccent() === k ? "on" : ""}" data-a="${k}" aria-label="${esc(accentName(k))}" style="--sw-d:${g("dark")};--sw-l:${g("light")}">${k === "system" ? '<span class="sys">✦</span>' : ""}${ICONS.check}</button>`;
+            }).join("")}
+          </div>
+        </div>
         <label class="row"><span class="lbl">${esc(L("theme"))}</span>
           <span class="select-wrap"><select class="select" id="s-theme">
             ${["system", "dark", "light"].map((k) => opt(k, L("theme_" + k), settings.theme === k)).join("")}
@@ -1436,6 +1516,21 @@ async function renderSettings() {
   bind("#s-haptics", "haptics", () => haptic(15));
   bind("#s-bgplay", "bgPlay", () => (settings.bgPlay ? syncNative() : native("stop")));
   $("#s-theme").onchange = (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(true); };
+  $("#s-style").onclick = (e) => {
+    const b = e.target.closest(".style-opt"); if (!b || b.dataset.v === settings.uiStyle) return;
+    settings.uiStyle = b.dataset.v; saveSettings();
+    $("#s-style").querySelectorAll(".style-opt").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
+    haptic(12);
+    applyTheme(true);
+  };
+  $("#s-accent").onclick = (e) => {
+    const b = e.target.closest(".swatch"); if (!b) return;
+    settings.accent = b.dataset.a; saveSettings();
+    $("#s-accent").querySelectorAll(".swatch").forEach((x) => x.classList.toggle("on", x === b));
+    $("#s-accent-name").textContent = accentName(b.dataset.a);
+    haptic(12);
+    applyTheme(true);
+  };
   bind("#s-compact", "compact", applyLook);
   bind("#s-motion", "reduceMotion", applyLook);
   bind("#s-autoupd", "autoUpdate");
@@ -1508,6 +1603,7 @@ async function downloadUpdate(btn, status) {
   btn.disabled = false;
 }
 
+const accentName = (k) => (I18N[LANG].accents || I18N.en.accents)[k] || k;
 const fmtDb = (g) => (g > 0 ? "+" : "") + g + " dB";
 
 // ---------- easter egg: 7 taps on the title ----------
@@ -1593,6 +1689,7 @@ function route() {
 setLanguage();
 applyLook();
 applyTheme();
+loadSystemColors();
 restoreSession();
 installedVersion();
 window.addEventListener("hashchange", route);

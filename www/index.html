@@ -8,11 +8,15 @@
   <title>ArtistGrid</title>
   <link rel="stylesheet" href="style.css" />
   <script>
-    // apply the saved theme before the first paint (no dark→light flash)
+    // apply the saved theme, style and colours before the first paint (no flash)
     try {
-      var s = JSON.parse(localStorage.getItem("settings") || "{}"), t = s.theme || "dark";
+      var s = JSON.parse(localStorage.getItem("settings") || "{}"), t = s.theme || "dark", r = document.documentElement;
       if (t === "system") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-      document.documentElement.dataset.theme = t;
+      r.dataset.theme = t;
+      r.dataset.style = s.uiStyle === "material" ? "material" : "glass";
+      r.dataset.accent = s.accent || "mono";
+      var v = JSON.parse(localStorage.getItem("accent_vars") || "null");
+      if (v && v[t]) for (var k in v[t]) r.style.setProperty(k, v[t][k]);
     } catch (e) {}
   </script>
 </head>

@@ -9,14 +9,19 @@
   --surface: rgba(255,255,255,.045);
   --surface-2: rgba(255,255,255,.08);
   --border: rgba(255,255,255,.08);
-  --accent: #ffffff;
-  --on-accent: #000000;
+  /* accent: a gradient pair (set from Settings → Appearance; see ACCENTS in app.js) */
+  --a1: #ffffff;
+  --a2: #e4e4ea;
+  --on-accent: #111114;
+  --accent: var(--a1);
+  --accent-grad: linear-gradient(135deg, var(--a1), var(--a2));
   --fav: #ff4d6d;
   --ok: #4ade80;
   --warn: #facc15;
   --bad: #f87171;
   --link: #8ab4ff;
   --glow: rgba(120,120,160,.16);
+  --glow2: transparent;
   --ph-default: linear-gradient(135deg, #2a2a33, #15151a);
   --menu-bg: #1a1a1e;
   --backdrop-opacity: .55;
@@ -63,7 +68,8 @@
   --surface: rgba(255,255,255,.8);
   --surface-2: rgba(0,0,0,.05);
   --border: rgba(0,0,0,.08);
-  --accent: #111114;
+  --a1: #111114;
+  --a2: #2e2e36;
   --on-accent: #ffffff;
   --ok: #15803d;
   --warn: #a16207;
@@ -106,7 +112,9 @@ body {
 /* fixed ambient glow on its own layer (background-attachment: fixed repaints on every scroll) */
 body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(120% 50% at 50% -8%, var(--glow), transparent 70%);
+  background:
+    radial-gradient(120% 50% at 50% -8%, var(--glow), transparent 70%),
+    radial-gradient(80% 40% at 100% -4%, var(--glow2), transparent 70%);
 }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 a { color: inherit; }
@@ -186,7 +194,7 @@ body.scrolled .head::before { opacity: 1; }
   flex-shrink: 0; padding: 7px 14px; border-radius: 999px; color: var(--tag-text); font-size: 13px;
   transition: transform .3s var(--spring), background-color .2s, color .2s;
 }
-.chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+.chip.on { background: var(--accent-grad); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
 
 /* ---------- Image placeholders ---------- */
 .thumb {
@@ -248,7 +256,7 @@ body.compact .card .ph { font-size: 24px; }
 .search-row { position: relative; display: flex; gap: 8px; align-items: center; }
 .search-row .search-wrap { flex: 1; min-width: 0; }
 #filter-btn { width: 44px; height: 44px; transition: transform .3s var(--spring), background-color .2s, color .2s; }
-#filter-btn.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+#filter-btn.on { background: var(--accent-grad); color: var(--on-accent); border-color: var(--accent); }
 #filter-btn.open { background: rgba(var(--ink),.18); }
 .sections { padding-bottom: 0; }
 
@@ -297,7 +305,7 @@ body.compact .card .ph { font-size: 24px; }
   width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
   transition: transform .3s var(--spring);
 }
-.track .play.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.track .play.on { background: var(--accent-grad); color: var(--on-accent); border-color: var(--accent); }
 .track .play:disabled { opacity: .3; }
 .track .play svg { width: 15px; height: 15px; }
 /* animated "now playing" bars replace the play icon on the current track */
@@ -339,7 +347,7 @@ body.is-playing .track .play.on .bars i { animation: bar 1s ease-in-out infinite
 .spinner { width: 28px; height: 28px; border: 3px solid rgba(var(--ink),.15); border-top-color: var(--text); border-radius: 50%; margin: 0 auto 14px; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .btn {
-  padding: 9px 16px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 13.5px;
+  padding: 9px 16px; border-radius: 999px; background: var(--accent-grad); color: var(--on-accent); font-weight: 600; font-size: 13.5px;
   transition: transform .3s var(--spring), opacity .2s; white-space: nowrap;
 }
 .btn.ghost { background: var(--pill-fill); color: var(--text); border: 1px solid var(--pill-stroke); box-shadow: var(--pill-shadow); }
@@ -382,6 +390,7 @@ a.row::after { content: "↗"; color: var(--muted); }
   transition: transform .35s var(--spring);
 }
 .switch:checked { background: var(--ok); }
+:root:not([data-accent="mono"]) .switch:checked { background: var(--accent-grad); }
 .switch:checked::after { transform: translateX(20px); }
 .switch:disabled { opacity: .4; }
 
@@ -469,12 +478,12 @@ body.in-sub #lens.ready { opacity: .45; }
 #p-sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #player .icon-btn { width: 38px; height: 38px; }
 #player .icon-btn svg { width: 20px; height: 20px; }
-.icon-btn.big { background: var(--accent); color: var(--on-accent); }
+.icon-btn.big { background: var(--accent-grad); color: var(--on-accent); }
 .icon-btn.big svg { fill: currentColor; stroke: currentColor; }
 #p-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; padding: 0 18px; cursor: pointer; }
 #p-progress::before { content: ""; position: absolute; left: 18px; right: 18px; bottom: 4px; height: 2px; background: rgba(var(--ink),.15); border-radius: 2px; }
 /* scaleX instead of width: no layout on every timeupdate */
-#p-bar { position: absolute; left: 18px; right: 18px; bottom: 4px; height: 2px; background: var(--text); border-radius: 2px; transform-origin: left; transform: scaleX(0); }
+#p-bar { position: absolute; left: 18px; right: 18px; bottom: 4px; height: 2px; background: var(--accent-grad); border-radius: 2px; transform-origin: left; transform: scaleX(0); }
 
 /* ---------- Theme toggle ---------- */
 #theme-btn svg { transition: transform .5s var(--spring), opacity .25s; }
@@ -520,7 +529,7 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
 #np-fav.on svg { fill: var(--fav); stroke: var(--fav); }
 .np-seek { margin-top: 18px; }
 .np-seek input { width: 100%; display: block; }
-.np-seek input::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--text) var(--pct, 0%), rgba(var(--ink),.18) var(--pct, 0%)); }
+.np-seek input::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--accent) var(--pct, 0%), rgba(var(--ink),.18) var(--pct, 0%)); }
 .np-seek input::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; }
 .np-times { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; margin-top: -2px; }
 .np-controls { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 6px; }
@@ -529,7 +538,7 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
 .np-controls #np-play { width: 72px; height: 72px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
 .np-controls #np-play svg { width: 30px; height: 30px; }
 .np-toggle { color: var(--muted); position: relative; }
-.np-toggle.on { color: var(--text); }
+.np-toggle.on { color: var(--accent); }
 .np-toggle.on::after { content: ""; position: absolute; bottom: 6px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
 .np-toggle .one { position: absolute; top: 9px; right: 9px; font-size: 9px; font-weight: 700; }
 .np-extra { display: flex; align-items: center; gap: 8px; margin: 10px 0 22px; }
@@ -553,6 +562,138 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
 .q-item span { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .q-item.cur b { color: var(--fav); }
 .np-device, .pill { background: var(--pill-fill); border: 1px solid var(--pill-stroke); box-shadow: var(--pill-shadow); }
+
+/* ---------- Settings: style + colour pickers ---------- */
+.style-pick { display: flex; gap: 10px; margin-top: 10px; }
+.style-opt {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 8px 10px;
+  border-radius: var(--r-md); background: rgba(var(--ink),.04); border: 2px solid transparent;
+  font-size: 13px; font-weight: 600; text-align: center;
+  transition: transform .3s var(--spring), border-color .2s;
+}
+.style-opt:active { transform: scale(.96); }
+.style-opt.on { border-color: var(--accent); }
+.prev { position: relative; display: block; height: 62px; border-radius: 11px; overflow: hidden; }
+.prev i { position: absolute; left: 10px; right: 10px; bottom: 9px; height: 20px; }
+/* glass: blurred frosted pill over colourful shapes */
+.prev-glass { background: var(--bg); }
+.prev-glass::before, .prev-glass::after { content: ""; position: absolute; border-radius: 50%; background: var(--accent-grad); }
+.prev-glass::before { width: 46px; height: 46px; left: 14%; top: 4px; }
+.prev-glass::after { width: 30px; height: 30px; right: 16%; top: 18px; opacity: .8; }
+.prev-glass i {
+  z-index: 1; border-radius: 999px; background: rgba(var(--ink),.12); border: 1px solid rgba(var(--ink),.22);
+  -webkit-backdrop-filter: blur(8px) saturate(1.6); backdrop-filter: blur(8px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+/* material: flat tonal surfaces with a pill indicator */
+.prev-material { background: var(--md-surface, #111113); }
+.prev-material::before { content: ""; position: absolute; left: 10px; right: 10px; top: 9px; height: 16px; border-radius: 8px; background: var(--md-c-highest, #2b2b31); }
+.prev-material i { border-radius: 10px; background: var(--md-c-high, #232327); }
+.prev-material i::before { content: ""; position: absolute; left: 50%; top: 4px; width: 30px; height: 12px; margin-left: -15px; border-radius: 6px; background: var(--accent-grad); }
+.swatches { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.swatch {
+  position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--sw-d); box-shadow: inset 0 0 0 1px rgba(var(--ink),.14);
+  transition: transform .3s var(--spring), box-shadow .2s;
+}
+[data-theme="light"] .swatch { background: var(--sw-l); }
+.swatch:active { transform: scale(.88); }
+.swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.swatch svg { position: absolute; width: 20px; height: 20px; stroke: #111114; stroke-width: 3; opacity: 0; transition: opacity .2s; }
+[data-theme="light"] .swatch svg { stroke: #fff; }
+.swatch.on svg { opacity: 1; }
+.swatch .sys { font-size: 15px; color: #111114; transition: opacity .2s; }
+[data-theme="light"] .swatch .sys { color: #fff; }
+.swatch.on .sys { opacity: 0; }
+
+/* ---------- Material You ----------
+   Flat tonal surfaces tinted with the accent (no blur), bigger rounded shapes, pill indicators in
+   the navigation bar, Material 3 switches and sliders. Colours come from accentVars() in app.js. */
+:root[data-style="material"] {
+  --md-outline: #8e8e98;
+  --md-inverse: #e6e6ec; --md-on-inverse: #1b1b1f;
+  --bg: var(--md-surface, #111113);
+  --surface: var(--md-c-low, #18181b);
+  --surface-2: var(--md-c-highest, #2b2b31);
+  --border: rgba(var(--ink),.07);
+  --menu-bg: var(--md-c, #1d1d21);
+  --glass-fill: var(--md-c-high, #232327);
+  --glass-stroke: transparent;
+  --glass-shadow: 0 1px 3px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.22);
+  --glass-blur: none;
+  --pill-fill: var(--md-c-highest, #2b2b31);
+  --pill-stroke: transparent;
+  --pill-shadow: none;
+  --r-md: 20px;
+  --r-lg: 24px;
+}
+:root[data-style="material"][data-theme="light"] {
+  --md-outline: #74747e;
+  --md-inverse: #2f2f34; --md-on-inverse: #f2f2f6;
+  --bg: var(--md-surface, #fafafc);
+  --surface: var(--md-c-low, #f3f3f7);
+  --surface-2: var(--md-c-highest, #e1e1e9);
+  --menu-bg: var(--md-c, #ededf2);
+  --glass-fill: var(--md-c-high, #e7e7ee);
+  --glass-shadow: 0 1px 2px rgba(0,0,0,.1), 0 3px 10px rgba(0,0,0,.08);
+  --pill-fill: var(--md-c-highest, #e1e1e9);
+}
+[data-style="material"] body { font-family: Roboto, "Google Sans", system-ui, sans-serif; }
+[data-style="material"] body::before { display: none; }
+[data-style="material"] .head-row h1 { font-weight: 500; letter-spacing: 0; }
+[data-style="material"] .head::before { border-bottom: 0; box-shadow: none; }
+[data-style="material"] .search { background: var(--md-c-highest, #2b2b31); border-color: transparent; border-radius: 28px; padding-top: 13px; padding-bottom: 13px; }
+[data-style="material"] .search:focus { border-color: var(--accent); }
+[data-style="material"] .chip { border-radius: 10px; background: transparent; border: 1px solid var(--md-outline); }
+[data-style="material"] .chip.on { background: var(--md-sec); color: var(--md-on-sec); border-color: transparent; }
+[data-style="material"] .icon-btn.round { background: var(--md-c-highest); }
+[data-style="material"] #filter-btn.on { background: var(--md-sec); color: var(--md-on-sec); }
+[data-style="material"] .card { border: 0; }
+[data-style="material"] .card .badge { border: 0; }
+[data-style="material"] .era, [data-style="material"] .rows { border: 0; }
+[data-style="material"] .era { margin-bottom: 8px; }
+[data-style="material"] .era-head .thumb { border-radius: 14px; }
+[data-style="material"] .avatar { border-radius: 16px; border: 0; }
+[data-style="material"] .tag { border-radius: 8px; }
+[data-style="material"] .track .play { border-radius: 12px; background: var(--md-c-highest); }
+[data-style="material"] .track .play.on { background: var(--accent-grad); }
+[data-style="material"] .btn.ghost { background: var(--md-sec); color: var(--md-on-sec); border: 0; }
+[data-style="material"] .pill-link { background: var(--md-sec); color: var(--md-on-sec); border: 0; }
+[data-style="material"] .style-opt { background: var(--md-c, #1d1d21); }
+[data-style="material"] .menu { border-radius: 16px; }
+[data-style="material"] .menu-item { border-radius: 10px; }
+[data-style="material"] .menu-item.on { background: var(--md-sec); color: var(--md-on-sec); }
+/* navigation bar: tonal pill behind the active icon instead of the sliding glass lens */
+[data-style="material"] #tabs-bar { border-radius: 28px; }
+[data-style="material"] #lens { display: none; }
+[data-style="material"] .tab { font-weight: 500; }
+[data-style="material"] .tab svg { width: 56px; height: 30px; padding: 3px 16px; border-radius: 15px; transition: background-color .25s, transform .35s var(--spring); }
+[data-style="material"] .tab.on { color: var(--text); font-weight: 700; }
+[data-style="material"] .tab.on svg { background: var(--md-sec); color: var(--md-on-sec); transform: none; }
+[data-style="material"] .tab[data-f="fav"].on svg { color: var(--fav); }
+[data-style="material"] .dock-btn { border-radius: 20px; background: var(--md-pri); color: var(--md-on-pri); }
+/* player: rounded-square buttons; the big play button morphs from circle to squircle while playing */
+[data-style="material"] #player { border-radius: 20px; }
+[data-style="material"] #player .icon-btn.big { border-radius: 14px; }
+[data-style="material"] .np-cover { border-radius: 28px; }
+[data-style="material"] .np-controls #np-play { border-radius: 36px; transition: border-radius .4s var(--spring), transform .3s var(--spring); }
+[data-style="material"] body.is-playing .np-controls #np-play { border-radius: 24px; }
+[data-style="material"] .np-device { background: var(--md-c-high); }
+[data-style="material"] .np-queue .rows { background: var(--md-c-low); }
+/* Material 3 switch: outlined track with a small thumb that grows when on */
+[data-style="material"] .switch { width: 52px; height: 32px; background: var(--md-c-highest); border: 2px solid var(--md-outline); }
+[data-style="material"] .switch::after {
+  top: 6px; left: 6px; width: 16px; height: 16px; background: var(--md-outline); box-shadow: none;
+  transition: transform .35s var(--spring), width .2s, height .2s, top .2s, left .2s, background-color .2s;
+}
+[data-style="material"] .switch:checked { background: var(--accent-grad); border-color: transparent; }
+[data-style="material"] .switch:checked::after { top: 2px; left: 2px; width: 24px; height: 24px; background: var(--on-accent); transform: translateX(20px); }
+/* Material 3 slider: thicker track and a vertical bar handle */
+[data-style="material"] input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; }
+[data-style="material"] input[type="range"]::-webkit-slider-thumb { width: 6px; height: 28px; margin-top: -11px; border-radius: 3px; background: var(--accent); box-shadow: none; }
+[data-style="material"] .np-seek input::-webkit-slider-thumb { width: 6px; height: 22px; margin-top: -8px; }
+/* snackbar */
+[data-style="material"] #toast { background: var(--md-inverse); color: var(--md-on-inverse); border: 0; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
 
 /* ---------- Easter egg: bouncing "DVD" logo ---------- */
 #dvd { position: fixed; inset: 0; z-index: 45; background: rgba(0,0,0,.25); animation: fade-in .3s ease; cursor: pointer; }

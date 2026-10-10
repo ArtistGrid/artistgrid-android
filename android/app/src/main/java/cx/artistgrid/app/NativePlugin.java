@@ -25,6 +25,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -260,6 +261,27 @@ public class NativePlugin extends Plugin {
                 call.reject(e.getMessage());
             }
         }).start();
+    }
+
+    /**
+     * Material You colours from the wallpaper (Android 12+): primary and tertiary accents for the
+     * dark and light themes, as "#rrggbb". Resolves an empty object on older versions.
+     */
+    @PluginMethod
+    public void getSystemColors(PluginCall call) {
+        JSObject ret = new JSObject();
+        if (Build.VERSION.SDK_INT >= 31) {
+            Context ctx = getContext();
+            ret.put("dark", colors(ctx, android.R.color.system_accent1_200, android.R.color.system_accent3_200));
+            ret.put("light", colors(ctx, android.R.color.system_accent1_600, android.R.color.system_accent3_600));
+        }
+        call.resolve(ret);
+    }
+
+    private static JSArray colors(Context ctx, int... ids) {
+        JSArray out = new JSArray();
+        for (int id : ids) out.put(String.format("#%06x", ContextCompat.getColor(ctx, id) & 0xffffff));
+        return out;
     }
 
     /** Light or dark system bar icons (and bar colour on Android versions that still colour them). */
