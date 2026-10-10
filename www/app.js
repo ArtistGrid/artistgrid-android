@@ -1,9 +1,16 @@
 "use strict";
 
+const APP_VERSION = "1.2.0";
+const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
 const ASSETS = "https://assets.artistgrid.cx/webp/";
 const PAGE = 60; // tracks rendered per batch
+
+// Inside the Android app, /_proxy?u=… is served by MainActivity: it fetches the URL natively
+// (no referrer, no CORS), which rescues blocked covers and lets the equalizer process audio.
+const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+const proxied = (u) => "/_proxy?u=" + encodeURIComponent(u);
 
 const $ = (s, r = document) => r.querySelector(s);
 const view = $("#view");
@@ -12,137 +19,67 @@ const state = {
   filter: "all",
   query: "",
   tracker: null,      // current tracker JSON
+  artistName: "",
   queue: [],          // playable tracks for the player
   qIndex: -1,
+  update: null,       // { version, url } when a newer release exists
 };
-
-// ---------- i18n (follows the device language) ----------
-const I18N = {
-  en: {
-    back: "Back", prev: "Previous", next: "Next", playPause: "Play/Pause", favorite: "Favorite", play: "Play",
-    tabAll: "Artists", tabBest: "Top", tabUpdated: "Updated", tabFav: "Favorites",
-    titleBest: "Recommended", titleUpdated: "Recently updated",
-    favAdded: "Added to favorites", favRemoved: "Removed from favorites", retry: "Retry",
-    artistsOffline: "Artist list offline (saved copy)", loadingArtists: "Loading artists…",
-    artistsError: "Couldn't load the artist list.", searchArtist: "Search artists…",
-    nArtists: ["{n} artist", "{n} artists"], noFavs: "No favorites yet: open an artist and tap ♥.", noResults: "No results.",
-    artistNotFound: "Artist not found.", loadingTracker: "Loading tracker…",
-    trackerError: "Couldn't load the tracker. Check your connection.", trackerOffline: "Offline: cached tracker",
-    nTracks: ["{n} track", "{n} tracks"], nEras: ["{n} era", "{n} eras"], updatedOn: "upd. {d}", trackerBy: "Tracker by {c}",
-    searchTracks: ["Search {n} track…", "Search {n} tracks…"],
-    fAll: "All", fPlay: "▶ Playable", fFull: "Full", fSnippet: "Snippet",
-    emptyTab: "No data in this tab.", noTracks: "No tracks.", nResults: ["{n} result", "{n} results"],
-    showMore: "Show more ({n})", cantPlay: "Can't play this track", audioError: "Error loading audio",
-  },
-  it: {
-    back: "Indietro", prev: "Precedente", next: "Successivo", playPause: "Play/Pausa", favorite: "Preferito", play: "Riproduci",
-    tabAll: "Artisti", tabBest: "Top", tabUpdated: "Recenti", tabFav: "Preferiti",
-    titleBest: "Consigliati", titleUpdated: "Aggiornati di recente",
-    favAdded: "Aggiunto ai preferiti", favRemoved: "Rimosso dai preferiti", retry: "Riprova",
-    artistsOffline: "Lista artisti offline (copia salvata)", loadingArtists: "Carico gli artisti…",
-    artistsError: "Impossibile caricare la lista artisti.", searchArtist: "Cerca un artista…",
-    nArtists: ["{n} artista", "{n} artisti"], noFavs: "Nessun preferito: apri un artista e tocca ♥.", noResults: "Nessun risultato.",
-    artistNotFound: "Artista non trovato.", loadingTracker: "Carico il tracker…",
-    trackerError: "Impossibile caricare il tracker. Controlla la connessione.", trackerOffline: "Offline: tracker in cache",
-    nTracks: ["{n} brano", "{n} brani"], nEras: ["{n} era", "{n} ere"], updatedOn: "agg. {d}", trackerBy: "Tracker di {c}",
-    searchTracks: ["Cerca in {n} brano…", "Cerca in {n} brani…"],
-    fAll: "Tutti", fPlay: "▶ Ascoltabili", fFull: "Full", fSnippet: "Snippet",
-    emptyTab: "Nessun dato in questa scheda.", noTracks: "Nessun brano.", nResults: ["{n} risultato", "{n} risultati"],
-    showMore: "Mostra altri ({n})", cantPlay: "Impossibile riprodurre questo brano", audioError: "Errore nel caricamento audio",
-  },
-  es: {
-    back: "Atrás", prev: "Anterior", next: "Siguiente", playPause: "Reproducir/Pausa", favorite: "Favorito", play: "Reproducir",
-    tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recientes", tabFav: "Favoritos",
-    titleBest: "Recomendados", titleUpdated: "Actualizados",
-    favAdded: "Añadido a favoritos", favRemoved: "Eliminado de favoritos", retry: "Reintentar",
-    artistsOffline: "Lista de artistas sin conexión (copia guardada)", loadingArtists: "Cargando artistas…",
-    artistsError: "No se pudo cargar la lista de artistas.", searchArtist: "Buscar artistas…",
-    nArtists: ["{n} artista", "{n} artistas"], noFavs: "Aún no hay favoritos: abre un artista y toca ♥.", noResults: "Sin resultados.",
-    artistNotFound: "Artista no encontrado.", loadingTracker: "Cargando tracker…",
-    trackerError: "No se pudo cargar el tracker. Revisa tu conexión.", trackerOffline: "Sin conexión: tracker en caché",
-    nTracks: ["{n} canción", "{n} canciones"], nEras: ["{n} era", "{n} eras"], updatedOn: "act. {d}", trackerBy: "Tracker de {c}",
-    searchTracks: ["Buscar en {n} canción…", "Buscar en {n} canciones…"],
-    fAll: "Todo", fPlay: "▶ Reproducibles", fFull: "Full", fSnippet: "Snippet",
-    emptyTab: "No hay datos en esta pestaña.", noTracks: "No hay canciones.", nResults: ["{n} resultado", "{n} resultados"],
-    showMore: "Mostrar más ({n})", cantPlay: "No se puede reproducir esta canción", audioError: "Error al cargar el audio",
-  },
-  fr: {
-    back: "Retour", prev: "Précédent", next: "Suivant", playPause: "Lecture/Pause", favorite: "Favori", play: "Lire",
-    tabAll: "Artistes", tabBest: "Top", tabUpdated: "Récents", tabFav: "Favoris",
-    titleBest: "Recommandés", titleUpdated: "Mis à jour",
-    favAdded: "Ajouté aux favoris", favRemoved: "Retiré des favoris", retry: "Réessayer",
-    artistsOffline: "Liste des artistes hors ligne (copie enregistrée)", loadingArtists: "Chargement des artistes…",
-    artistsError: "Impossible de charger la liste des artistes.", searchArtist: "Rechercher un artiste…",
-    nArtists: ["{n} artiste", "{n} artistes"], noFavs: "Aucun favori : ouvrez un artiste et touchez ♥.", noResults: "Aucun résultat.",
-    artistNotFound: "Artiste introuvable.", loadingTracker: "Chargement du tracker…",
-    trackerError: "Impossible de charger le tracker. Vérifiez votre connexion.", trackerOffline: "Hors ligne : tracker en cache",
-    nTracks: ["{n} titre", "{n} titres"], nEras: ["{n} ère", "{n} ères"], updatedOn: "maj {d}", trackerBy: "Tracker par {c}",
-    searchTracks: ["Rechercher dans {n} titre…", "Rechercher dans {n} titres…"],
-    fAll: "Tout", fPlay: "▶ Écoutables", fFull: "Full", fSnippet: "Snippet",
-    emptyTab: "Aucune donnée dans cet onglet.", noTracks: "Aucun titre.", nResults: ["{n} résultat", "{n} résultats"],
-    showMore: "Afficher plus ({n})", cantPlay: "Impossible de lire ce titre", audioError: "Erreur de chargement audio",
-  },
-  de: {
-    back: "Zurück", prev: "Zurück", next: "Weiter", playPause: "Wiedergabe/Pause", favorite: "Favorit", play: "Abspielen",
-    tabAll: "Künstler", tabBest: "Top", tabUpdated: "Neu", tabFav: "Favoriten",
-    titleBest: "Empfohlen", titleUpdated: "Kürzlich aktualisiert",
-    favAdded: "Zu Favoriten hinzugefügt", favRemoved: "Aus Favoriten entfernt", retry: "Erneut versuchen",
-    artistsOffline: "Künstlerliste offline (gespeicherte Kopie)", loadingArtists: "Künstler werden geladen…",
-    artistsError: "Künstlerliste konnte nicht geladen werden.", searchArtist: "Künstler suchen…",
-    nArtists: ["{n} Künstler", "{n} Künstler"], noFavs: "Noch keine Favoriten: Öffne einen Künstler und tippe auf ♥.", noResults: "Keine Ergebnisse.",
-    artistNotFound: "Künstler nicht gefunden.", loadingTracker: "Tracker wird geladen…",
-    trackerError: "Tracker konnte nicht geladen werden. Prüfe deine Verbindung.", trackerOffline: "Offline: Tracker aus dem Cache",
-    nTracks: ["{n} Titel", "{n} Titel"], nEras: ["{n} Ära", "{n} Ären"], updatedOn: "akt. {d}", trackerBy: "Tracker von {c}",
-    searchTracks: ["{n} Titel durchsuchen…", "{n} Titel durchsuchen…"],
-    fAll: "Alle", fPlay: "▶ Abspielbar", fFull: "Full", fSnippet: "Snippet",
-    emptyTab: "Keine Daten in diesem Tab.", noTracks: "Keine Titel.", nResults: ["{n} Ergebnis", "{n} Ergebnisse"],
-    showMore: "Mehr anzeigen ({n})", cantPlay: "Dieser Titel kann nicht abgespielt werden", audioError: "Fehler beim Laden des Audios",
-  },
-  pt: {
-    back: "Voltar", prev: "Anterior", next: "Próxima", playPause: "Reproduzir/Pausar", favorite: "Favorito", play: "Reproduzir",
-    tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recentes", tabFav: "Favoritos",
-    titleBest: "Recomendados", titleUpdated: "Atualizados",
-    favAdded: "Adicionado aos favoritos", favRemoved: "Removido dos favoritos", retry: "Tentar novamente",
-    artistsOffline: "Lista de artistas offline (cópia salva)", loadingArtists: "Carregando artistas…",
-    artistsError: "Não foi possível carregar a lista de artistas.", searchArtist: "Buscar artistas…",
-    nArtists: ["{n} artista", "{n} artistas"], noFavs: "Nenhum favorito: abra um artista e toque em ♥.", noResults: "Nenhum resultado.",
-    artistNotFound: "Artista não encontrado.", loadingTracker: "Carregando tracker…",
-    trackerError: "Não foi possível carregar o tracker. Verifique a conexão.", trackerOffline: "Offline: tracker em cache",
-    nTracks: ["{n} faixa", "{n} faixas"], nEras: ["{n} era", "{n} eras"], updatedOn: "atual. {d}", trackerBy: "Tracker de {c}",
-    searchTracks: ["Buscar em {n} faixa…", "Buscar em {n} faixas…"],
-    fAll: "Tudo", fPlay: "▶ Reproduzíveis", fFull: "Full", fSnippet: "Snippet",
-    emptyTab: "Sem dados nesta aba.", noTracks: "Nenhuma faixa.", nResults: ["{n} resultado", "{n} resultados"],
-    showMore: "Mostrar mais ({n})", cantPlay: "Não foi possível reproduzir esta faixa", audioError: "Erro ao carregar o áudio",
-  },
-};
-const LOCALE = (navigator.languages && navigator.languages[0]) || navigator.language || "en";
-const LANG = I18N[LOCALE.slice(0, 2).toLowerCase()] ? LOCALE.slice(0, 2).toLowerCase() : "en";
-const plural = new Intl.PluralRules(LANG);
-function L(key, vars = {}) {
-  let s = I18N[LANG][key] ?? I18N.en[key] ?? key;
-  if (Array.isArray(s)) s = s[plural.select(vars.n ?? 0) === "one" ? 0 : 1];
-  return s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
-}
-document.documentElement.lang = LANG;
-document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = L(el.dataset.i18n)));
-document.querySelectorAll("[data-i18n-aria]").forEach((el) => el.setAttribute("aria-label", L(el.dataset.i18nAria)));
-
-// ---------- utils ----------
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const slugImg = (name) => ASSETS + name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".webp";
-const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-const isSheetId = (u) => /^[A-Za-z0-9_-]{25,}$/.test(u);
-
-function toast(msg) {
-  const t = $("#toast");
-  t.textContent = msg; t.hidden = false;
-  clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2200);
-}
 
 function store(key, val) {
   try { if (val === undefined) return JSON.parse(localStorage.getItem(key)); localStorage.setItem(key, JSON.stringify(val)); }
   catch { return null; }
 }
+
+// ---------- settings ----------
+const EQ_FREQS = [60, 230, 910, 3600, 14000];
+const EQ_PRESETS = { flat: [0, 0, 0, 0, 0], bass: [6, 4, 0, 0, 0], vocal: [-2, 0, 3, 4, 1], treble: [0, 0, 0, 3, 6], loud: [5, 2, -1, 2, 5] };
+const SPEEDS = [0.75, 1, 1.25, 1.5];
+const DEFAULTS = {
+  lang: "auto", eqOn: false, eqPreset: "flat", eqGains: [0, 0, 0, 0, 0],
+  autoplay: true, speed: 1, compact: false, reduceMotion: false, autoUpdate: true,
+};
+const settings = { ...DEFAULTS, ...(store("settings") || {}) };
+const saveSettings = () => store("settings", settings);
+function applyLook() {
+  document.body.classList.toggle("compact", settings.compact);
+  document.body.classList.toggle("reduce-motion", settings.reduceMotion);
+}
+
+// ---------- i18n (device language unless overridden in Settings) ----------
+let LANG = "en", LOCALE = "en", plural = new Intl.PluralRules("en");
+function setLanguage() {
+  const device = (navigator.languages && navigator.languages[0]) || navigator.language || "en";
+  const pick = settings.lang !== "auto" ? settings.lang : device.slice(0, 2).toLowerCase();
+  LANG = I18N[pick] ? pick : "en";
+  LOCALE = settings.lang === "auto" && LANG === device.slice(0, 2).toLowerCase() ? device : LANG;
+  plural = new Intl.PluralRules(LANG);
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = L(el.dataset.i18n)));
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => el.setAttribute("aria-label", L(el.dataset.i18nAria)));
+}
+function L(key, vars = {}) {
+  let s = I18N[LANG][key] ?? I18N.en[key] ?? key;
+  if (Array.isArray(s)) s = s[plural.select(vars.n ?? 0) === "one" ? 0 : 1];
+  return String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+}
+
+// ---------- utils ----------
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const isSheetId = (u) => /^[A-Za-z0-9_-]{25,}$/.test(u);
+
+function toast(msg, ms = 2200) {
+  const t = $("#toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), ms);
+}
+
+// Fades the freshly rendered page in (compositor-only: opacity + transform).
+function enter(el = view) {
+  if (settings.reduceMotion) return;
+  el.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 260, easing: "cubic-bezier(.22,1,.36,1)" });
+}
+
 const favs = new Set(store("favs") || []);
 const saveFavs = () => store("favs", [...favs]);
 
@@ -167,6 +104,8 @@ const idb = (() => {
   return {
     get: (k) => tx("readonly", (s) => s.get(k)).catch(() => null),
     set: (k, v) => tx("readwrite", (s) => s.put(v, k)).catch(() => {}),
+    count: () => tx("readonly", (s) => s.count()).catch(() => 0),
+    clear: () => tx("readwrite", (s) => s.clear()).catch(() => {}),
   };
 })();
 
@@ -204,6 +143,51 @@ function parseCsv(text) {
   return body.filter((r) => r.length > 1).map((r) => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? "").trim()])));
 }
 
+// ---------- images: fallback chain + placeholders ----------
+// Each <img> carries the URLs still to try in data-next. A failed load moves to the next one
+// (the same URL through the native proxy, then alternative names); when none is left the
+// image is hidden and the gradient placeholder underneath shows.
+function candidates(urls) {
+  const out = [];
+  for (const u of urls.filter(Boolean)) { out.push(u); if (NATIVE && /^https?:/.test(u)) out.push(proxied(u)); }
+  return [...new Set(out)];
+}
+function imgTag(urls, lazy = true) {
+  const [first, ...rest] = candidates(urls);
+  if (!first) return "";
+  return `<img ${lazy ? 'loading="lazy"' : ""} decoding="async" referrerpolicy="no-referrer" alt="" src="${esc(first)}" data-next="${esc(rest.map(encodeURIComponent).join(" "))}" />`;
+}
+function setImg(img, urls) {
+  const [first, ...rest] = candidates(urls);
+  img.classList.remove("loaded", "failed");
+  img.dataset.next = rest.map(encodeURIComponent).join(" ");
+  if (first) img.src = first; else { img.removeAttribute("src"); img.classList.add("failed"); }
+}
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (img.tagName !== "IMG" || !("next" in img.dataset)) return;
+  const [next, ...rest] = img.dataset.next.split(" ").filter(Boolean);
+  if (next) { img.dataset.next = rest.join(" "); img.src = decodeURIComponent(next); }
+  else img.classList.add("failed");
+}, true);
+document.addEventListener("load", (e) => { if (e.target.tagName === "IMG") e.target.classList.add("loaded"); }, true);
+
+function artistImgs(name) {
+  const base = name.toLowerCase();
+  return [
+    base.replace(/[^a-z0-9]/g, ""),
+    base.replace(/\$/g, "s").replace(/&/g, "and").replace(/[^a-z0-9]/g, ""),
+    norm(base).replace(/[^a-z0-9]/g, ""),
+  ].filter((s, i, a) => s && a.indexOf(s) === i).map((s) => ASSETS + s + ".webp");
+}
+// Stable gradient per name, so missing covers still look intentional.
+function phStyle(seed, color) {
+  if (color && /^#[0-9a-f]{3,8}$/i.test(color)) return `--ph:linear-gradient(135deg, ${color}, #111)`;
+  let h = 0; for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return `--ph:linear-gradient(135deg, hsl(${h} 45% 28%), hsl(${(h + 40) % 360} 35% 12%))`;
+}
+const initial = (s) => esc((String(s).trim()[0] || "?").toUpperCase());
+
 // ---------- audio link resolution ----------
 function audioUrl(link) {
   const u = link || "";
@@ -221,13 +205,14 @@ function playableUrl(track) {
   return null;
 }
 
-// ---------- chrome: bottom dock ----------
-const HOME_TITLES = { all: "ArtistGrid", best: "titleBest", updated: "titleUpdated", fav: "tabFav" };
+// ---------- chrome: bottom dock + sticky header ----------
+const HOME_TITLES = { all: null, best: "titleBest", updated: "titleUpdated", fav: "tabFav" };
 const FILTER_ROUTES = { all: "#/", best: "#/best", updated: "#/updated", fav: "#/fav" };
 
-function setChrome({ artist }) {
-  document.body.classList.toggle("in-artist", !!artist);
-  document.querySelectorAll("#tabs-bar .tab").forEach((b) => b.classList.toggle("on", b.dataset.f === state.filter));
+function setChrome({ sub, tab = state.filter }) {
+  document.body.classList.toggle("in-sub", !!sub);
+  document.querySelectorAll("#tabs-bar .tab").forEach((b) => b.classList.toggle("on", b.dataset.f === tab));
+  $("#lens").classList.toggle("none", !tab);
   moveLens();
 }
 
@@ -242,19 +227,36 @@ function moveLens() {
 // the bar resizes while the back button animates in/out
 new ResizeObserver(moveLens).observe($("#tabs-bar"));
 
+// The header turns to glass once content scrolls under it (one class toggle per frame at most).
+let scrollTick = false;
+function onScroll() {
+  if (scrollTick) return;
+  scrollTick = true;
+  requestAnimationFrame(() => { document.body.classList.toggle("scrolled", window.scrollY > 4); scrollTick = false; });
+}
+window.addEventListener("scroll", onScroll, { passive: true });
+
 $("#tabs-bar").onclick = (e) => {
   const b = e.target.closest(".tab"); if (!b) return;
   const target = FILTER_ROUTES[b.dataset.f];
-  if (location.hash === target || (!location.hash && target === "#/")) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  if (location.hash === target || (!location.hash && target === "#/")) { window.scrollTo({ top: 0, behavior: settings.reduceMotion ? "auto" : "smooth" }); return; }
   // switching tabs on the home replaces history so Back leaves the app instead of cycling tabs
-  if (!document.body.classList.contains("in-artist")) location.replace(target);
+  if (!document.body.classList.contains("in-sub")) location.replace(target);
   else location.hash = target;
 };
 $("#back").onclick = () => (history.length > 1 ? history.back() : (location.hash = "#/"));
 
+const ICONS = {
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+};
+const searchBox = (id, placeholder, value = "") =>
+  `<div class="search-wrap">${ICONS.search}<input class="search" id="${id}" type="search" placeholder="${esc(placeholder)}" value="${esc(value)}" autocomplete="off" /></div>`;
+
 function loading(msg) { view.innerHTML = `<div class="state"><div class="spinner"></div>${esc(msg)}</div>`; }
-function errorView(msg, retry) {
-  view.innerHTML = `<div class="state">${esc(msg)}<br><button class="btn" id="retry">${esc(L("retry"))}</button></div>`;
+function errorView(msg, retry, head = "") {
+  view.innerHTML = `${head}<div class="state">${esc(msg)}<br><button class="btn" id="retry">${esc(L("retry"))}</button></div>`;
   $("#retry").onclick = retry;
 }
 
@@ -278,22 +280,26 @@ async function loadArtists() {
 
 async function renderHome(filter = "all") {
   state.filter = filter;
-  setChrome({ artist: false });
+  setChrome({ sub: false });
   if (!state.artists.length) {
     loading(L("loadingArtists"));
     try { await loadArtists(); }
     catch { return errorView(L("artistsError"), () => renderHome(filter)); }
   }
-  const title = HOME_TITLES[filter] === "ArtistGrid" ? "ArtistGrid" : L(HOME_TITLES[filter]);
+  const title = HOME_TITLES[filter] ? L(HOME_TITLES[filter]) : "ArtistGrid";
   view.innerHTML = `
-    <div class="page-head"><h1>${esc(title)}</h1><span class="count" id="count"></span></div>
-    <div class="search-wrap">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input class="search" id="q" type="search" placeholder="${esc(L("searchArtist"))}" value="${esc(state.query)}" autocomplete="off" />
+    <div class="head">
+      <div class="head-row">
+        <h1>${esc(title)}</h1>
+        <span class="count" id="count"></span>
+        <button id="gear" class="icon-btn round ${state.update ? "dot" : ""}" aria-label="${esc(L("settings"))}">${ICONS.gear}</button>
+      </div>
+      ${searchBox("q", L("searchArtist"), state.query)}
     </div>
-    <div class="grid" id="grid" style="margin-top:14px"></div>`;
+    <div class="grid" id="grid"></div>`;
   const q = $("#q");
   q.oninput = () => { state.query = q.value; drawGrid(); };
+  $("#gear").onclick = () => (location.hash = "#/settings");
   $("#grid").onclick = (e) => {
     const c = e.target.closest(".card"); if (!c) return;
     const a = state.artists[c.dataset.i];
@@ -302,6 +308,7 @@ async function renderHome(filter = "all") {
   };
   drawGrid();
   if (state.homeScroll?.filter === filter) window.scrollTo(0, state.homeScroll.y);
+  enter($("#grid"));
 }
 
 function drawGrid() {
@@ -315,9 +322,9 @@ function drawGrid() {
   });
   $("#count").textContent = L("nArtists", { n: list.length });
   $("#grid").innerHTML = list.length ? list.map((a) => `
-    <button class="card" data-i="${a.idx}">
-      <div class="ph">${esc(a.name[0] || "?")}</div>
-      <img loading="lazy" src="${slugImg(a.name)}" alt="" onerror="this.remove()" />
+    <button class="card" data-i="${a.idx}" style="${phStyle(a.name)}">
+      <div class="ph">${initial(a.name)}</div>
+      ${imgTag(artistImgs(a.name))}
       <div class="badges">
         ${favs.has(a.name) ? '<span class="badge fav">♥</span>' : ""}
         ${a.best === "true" ? '<span class="badge">★</span>' : ""}
@@ -330,18 +337,21 @@ function drawGrid() {
 
 // ---------- artist / tracker ----------
 async function renderArtist(name, tabSlug) {
-  setChrome({ artist: true });
+  setChrome({ sub: true });
   try { await loadArtists(); } catch {}
   const a = state.artists.find((x) => x.name === name);
-  if (!a) return errorView(L("artistNotFound"), () => route());
+  const headHtml = (n, extra = "") => `
+    <div class="head"><div class="head-row"><h1>${esc(n)}</h1>${extra}</div></div>`;
+  if (!a) return errorView(L("artistNotFound"), () => route(), headHtml(name));
   state.artistName = a.name;
-  loading(L("loadingTracker"));
+  view.innerHTML = headHtml(a.name) + `<div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div>`;
 
   const path = tabSlug ? `/sh/${a.url}/tab/${encodeURIComponent(tabSlug)}` : `/sh/${a.url}/`;
   let res;
   try { res = await cachedJson(TRACKER_API + path, "t:" + a.url + ":" + (tabSlug || "")); }
-  catch { return errorView(L("trackerError"), () => renderArtist(name, tabSlug)); }
+  catch { return errorView(L("trackerError"), () => renderArtist(name, tabSlug), headHtml(a.name)); }
   if (res.offline) toast(L("trackerOffline"));
+  if (state.artistName !== a.name) return; // navigated away while loading
 
   const d = res.data;
   state.tracker = d;
@@ -353,32 +363,33 @@ async function renderArtist(name, tabSlug) {
   const credits = Array.isArray(d.credits) ? d.credits.join(", ") : (d.credits || a.credit);
 
   view.innerHTML = `
-    <div class="hero">
-      <img src="${slugImg(a.name)}" alt="" onerror="this.style.visibility='hidden'" />
-      <div class="info">
-        <h2>${esc(a.name)}</h2>
-        <p>${L("nTracks", { n: all.length })} · ${L("nEras", { n: eras.length })}${updated ? " · " + L("updatedOn", { d: updated }) : ""}</p>
-        ${credits ? `<p>${esc(L("trackerBy", { c: credits }))}</p>` : ""}
+    <div class="head">
+      <div class="head-row">
+        <h1>${esc(a.name)}</h1>
+        <button id="fav-toggle" class="icon-btn round ${favs.has(a.name) ? "on" : ""}" aria-label="${esc(L("favorite"))}">${ICONS.heart}</button>
       </div>
-      <button id="fav-toggle" class="icon-btn round ${favs.has(a.name) ? "on" : ""}" aria-label="${esc(L("favorite"))}">
-        <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg>
-      </button>
+      ${searchBox("tq", L("searchTracks", { n: all.length }))}
+      <div class="chips" id="tf">
+        ${[["all", L("fAll")], ["play", L("fPlay")], ["full", L("fFull")], ["snippet", L("fSnippet")]]
+          .map(([k, l], i) => `<button class="chip ${i ? "" : "on"}" data-f="${k}">${esc(l)}</button>`).join("")}
+      </div>
     </div>
-    <div class="links-row">
-      <a class="pill-link" href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit" target="_blank" rel="noopener">Google Sheet ↗</a>
-      ${(d.discord || []).slice(0, 1).map((u) => `<a class="pill-link" href="${esc(u)}" target="_blank" rel="noopener">Discord ↗</a>`).join("")}
-    </div>
-    <div class="chips" id="tabs">
-      ${(d.tabs || []).filter((t, i, arr) => arr.findIndex((x) => x.slug === t.slug) === i && !["key", "template"].includes(t.slug))
-        .map((t) => `<button class="chip ${t.slug === curTab ? "on" : ""}" data-s="${esc(t.slug)}">${esc(t.name)}</button>`).join("")}
-    </div>
-    <div class="search-wrap">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input class="search" id="tq" type="search" placeholder="${esc(L("searchTracks", { n: all.length }))}" autocomplete="off" />
-    </div>
-    <div class="chips" id="tf">
-      ${[["all", L("fAll")], ["play", L("fPlay")], ["full", L("fFull")], ["snippet", L("fSnippet")]]
-        .map(([k, l], i) => `<button class="chip ${i ? "" : "on"}" data-f="${k}">${l}</button>`).join("")}
+    <div class="hero-block">
+      <div class="hero">
+        <div class="thumb" style="${phStyle(a.name)}">${initial(a.name)}${imgTag(artistImgs(a.name), false)}</div>
+        <div class="info">
+          <p>${L("nTracks", { n: all.length })} · ${L("nEras", { n: eras.length })}${updated ? " · " + esc(L("updatedOn", { d: updated })) : ""}</p>
+          ${credits ? `<p>${esc(L("trackerBy", { c: credits }))}</p>` : ""}
+          <div class="links-row">
+            <a class="pill-link" href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit" target="_blank" rel="noopener">Google Sheet ↗</a>
+            ${(d.discord || []).slice(0, 1).map((u) => `<a class="pill-link" href="${esc(u)}" target="_blank" rel="noopener">Discord ↗</a>`).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="chips" id="tabs">
+        ${(d.tabs || []).filter((t, i, arr) => arr.findIndex((x) => x.slug === t.slug) === i && !["key", "template"].includes(t.slug))
+          .map((t) => `<button class="chip ${t.slug === curTab ? "on" : ""}" data-s="${esc(t.slug)}">${esc(t.name)}</button>`).join("")}
+      </div>
     </div>
     <div id="list"></div>`;
 
@@ -392,7 +403,8 @@ async function renderArtist(name, tabSlug) {
   };
 
   // keep the selected tab visible
-  $("#tabs .chip.on")?.scrollIntoView({ inline: "center", block: "nearest" });
+  const onTab = $("#tabs .chip.on");
+  if (onTab) $("#tabs").scrollLeft = onTab.offsetLeft - ($("#tabs").clientWidth - onTab.offsetWidth) / 2;
   $("#tabs").onclick = (e) => {
     const b = e.target.closest(".chip"); if (!b || b.classList.contains("on")) return;
     location.replace(`#/a/${encodeURIComponent(a.name)}/${encodeURIComponent(b.dataset.s)}`);
@@ -410,12 +422,13 @@ async function renderArtist(name, tabSlug) {
 
   const list = $("#list");
   const draw = () => {
+    // while searching/filtering, hide the artist info so results start right under the header
+    view.classList.toggle("searching", !!(tq || tf !== "all"));
     if (!tq && tf === "all") {
-      list.innerHTML = eras.map((e) => eraHtml(e)).join("") || `<div class="state">${esc(L("emptyTab"))}</div>`;
+      list.innerHTML = eras.map((e) => eraHtml(e, a.name)).join("") || `<div class="state">${esc(L("emptyTab"))}</div>`;
       return;
     }
-    const res = all.filter(matches);
-    renderFlat(list, res);
+    renderFlat(list, all.filter(matches));
   };
   $("#tq").oninput = (ev) => { tq = norm(ev.target.value.trim()); draw(); };
   $("#tf").onclick = (e) => {
@@ -449,15 +462,17 @@ async function renderArtist(name, tabSlug) {
   };
 
   draw();
+  enter($(".hero-block"));
+  enter(list);
 }
 
-function eraHtml(e) {
+function eraHtml(e, artist) {
   const s = e.stats;
   const sum = s ? [s.og_file && `${s.og_file} OG`, s.full && `${s.full} full`, s.snippet && `${s.snippet} snippet`].filter(Boolean).join(" · ") : "";
   return `
     <div class="era" data-e="${e.i}">
       <button class="era-head">
-        ${e.cover_art ? `<img loading="lazy" src="${esc(e.cover_art)}" alt="" onerror="this.style.visibility='hidden'" />` : `<img alt="" style="background:${esc(e.color || "#1a1a1c")}" />`}
+        <div class="thumb" style="${phStyle(e.name, e.color)}">${initial(e.name)}${imgTag([e.cover_art, ...(e.cover_art ? [] : artistImgs(artist))])}</div>
         <div class="t"><b>${esc(e.name)}</b><span>${L("nTracks", { n: e.tracks.length })}${sum ? " · " + sum : ""}</span></div>
         <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>
@@ -501,7 +516,8 @@ function trackEl(item, showEra) {
   const title = t.name?.title ?? t.name?.raw ?? t.name ?? "";
   const credits = (t.name?.credits || []).join(" ");
   const playable = !!playableUrl(t);
-  if (cur() && cur().t === t) el.classList.add("playing");
+  const on = cur() && cur().t === t;
+  if (on) el.classList.add("playing");
   const tags = [
     t.available_length && `<span class="tag">${esc(t.available_length)}</span>`,
     t.quality && `<span class="tag ${qualityClass(t.quality)}">${esc(t.quality)}</span>`,
@@ -511,7 +527,7 @@ function trackEl(item, showEra) {
   ].filter(Boolean).join("");
   const links = (t.links || []).filter((l) => l.url).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.text || l.url)}</a>`).join("");
   el.innerHTML = `
-    <button class="play ${cur() && cur().t === t ? "on" : ""}" ${playable ? "" : "disabled"} aria-label="${esc(L("play"))}">
+    <button class="play ${on ? "on" : ""}" ${playable ? "" : "disabled"} aria-label="${esc(L("play"))}">
       <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>
     </button>
     <div class="body">
@@ -525,40 +541,75 @@ function trackEl(item, showEra) {
   return el;
 }
 
-// ---------- player ----------
-const audio = $("#audio");
+// ---------- player + equalizer ----------
+// Two elements: "fx" plays through the native proxy (same origin) so Web Audio can apply the
+// equalizer; "raw" plays the remote URL directly and is used when the proxy can't serve a track.
+const audioFx = $("#audio-fx"), audioRaw = $("#audio-raw");
+let audio = NATIVE ? audioFx : audioRaw;
 const cur = () => state.queue[state.qIndex];
+const eq = { ctx: null, filters: [] };
+
+function ensureEq() {
+  if (eq.ctx || !NATIVE || !settings.eqOn) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  try {
+    eq.ctx = new Ctx();
+    let node = eq.ctx.createMediaElementSource(audioFx);
+    eq.filters = EQ_FREQS.map((f, i) => {
+      const b = eq.ctx.createBiquadFilter();
+      b.type = i === 0 ? "lowshelf" : i === EQ_FREQS.length - 1 ? "highshelf" : "peaking";
+      b.frequency.value = f; b.Q.value = 1;
+      node.connect(b); node = b;
+      return b;
+    });
+    node.connect(eq.ctx.destination);
+  } catch { eq.ctx = null; eq.filters = []; }
+  applyEq();
+}
+function applyEq() {
+  ensureEq();
+  eq.filters.forEach((b, i) => b.gain.setTargetAtTime(settings.eqOn ? settings.eqGains[i] : 0, eq.ctx.currentTime, 0.05));
+  if (eq.ctx?.state === "suspended") eq.ctx.resume();
+}
 
 function playItem(item, container) {
   const items = (container?._items || [item]).filter((x) => playableUrl(x.t)).map((x) => ({ ...x, artist: state.artistName }));
-  item = items.find((x) => x.t === item.t);
   state.queue = items;
-  state.qIndex = Math.max(0, items.indexOf(item));
+  state.qIndex = Math.max(0, items.findIndex((x) => x.t === item.t));
   startCurrent();
 }
 
-function startCurrent() {
+function useElement(el) {
+  if (audio !== el) { audio.pause(); audio = el; }
+}
+
+function startCurrent(direct = false) {
   const it = cur(); if (!it) return;
   const { t, e } = it;
   const title = t.name?.title ?? t.name?.raw ?? "";
-  audio.src = playableUrl(t);
-  audio.play().catch(() => toast(L("cantPlay")));
+  const url = playableUrl(t);
+  useElement(NATIVE && !direct ? audioFx : audioRaw);
+  ensureEq();
+  if (eq.ctx?.state === "suspended") eq.ctx.resume();
+  audio.src = audio === audioFx ? proxied(url) : url;
+  audio.playbackRate = settings.speed;
+  audio.play().catch(() => {});
   $("#player").hidden = false;
   document.body.classList.add("has-player");
   $("#p-title").textContent = title;
   $("#p-sub").textContent = `${it.artist} · ${e.name}`;
-  const cover = $("#p-cover");
-  cover.src = e.cover_art || "";
-  cover.style.visibility = e.cover_art ? "visible" : "hidden";
+  const thumb = $("#p-thumb");
+  thumb.setAttribute("style", phStyle(e.name, e.color));
+  setImg($("#p-cover"), [e.cover_art, ...artistImgs(it.artist)]);
   document.querySelectorAll(".track").forEach((el) => {
     const on = el._item?.t === t;
     el.classList.toggle("playing", on);
     el.querySelector(".play")?.classList.toggle("on", on);
   });
   if ("mediaSession" in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title, artist: $("#p-sub").textContent, artwork: e.cover_art ? [{ src: e.cover_art, sizes: "512x512" }] : [],
-    });
+    const art = e.cover_art || artistImgs(it.artist)[0];
+    navigator.mediaSession.metadata = new MediaMetadata({ title, artist: it.artist, album: e.name, artwork: art ? [{ src: art, sizes: "512x512" }] : [] });
   }
 }
 
@@ -568,24 +619,203 @@ function step(dir) {
   startCurrent();
 }
 
-$("#p-play").onclick = () => (audio.paused ? audio.play() : audio.pause());
+const togglePlay = () => {
+  if (eq.ctx?.state === "suspended") eq.ctx.resume();
+  audio.paused ? audio.play().catch(() => {}) : audio.pause();
+};
+$("#p-play").onclick = togglePlay;
 $("#p-next").onclick = () => step(1);
 $("#p-prev").onclick = () => (audio.currentTime > 3 ? (audio.currentTime = 0) : step(-1));
 $("#p-progress").onclick = (e) => {
   const r = e.currentTarget.getBoundingClientRect();
-  if (audio.duration) audio.currentTime = ((e.clientX - r.left - 12) / (r.width - 24)) * audio.duration;
+  if (audio.duration) audio.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left - 18) / (r.width - 36))) * audio.duration;
 };
-audio.ontimeupdate = () => { $("#p-bar").style.width = audio.duration ? (audio.currentTime / audio.duration) * 100 + "%" : "0"; };
-audio.onplay = () => $("#p-play-icon").setAttribute("d", "M7 4h3v16H7zM14 4h3v16h-3z");
-audio.onpause = () => $("#p-play-icon").setAttribute("d", "M7 4l13 8-13 8z");
-audio.onended = () => step(1);
-audio.onerror = () => { if (audio.src) toast(L("audioError")); };
+const playIcon = $("#p-play-icon"), bar = $("#p-bar");
+for (const el of [audioFx, audioRaw]) {
+  el.ontimeupdate = () => { if (el === audio) bar.style.transform = `scaleX(${el.duration ? el.currentTime / el.duration : 0})`; };
+  el.onplay = () => { if (el === audio) playIcon.setAttribute("d", "M7 4h3v16H7zM14 4h3v16h-3z"); };
+  el.onpause = () => { if (el === audio) playIcon.setAttribute("d", "M7 4l13 8-13 8z"); };
+  el.onended = () => { if (el === audio && settings.autoplay) step(1); };
+  el.onerror = () => {
+    if (el !== audio || !el.getAttribute("src")) return;
+    // the proxy couldn't stream it: retry the same track directly (without the equalizer)
+    if (el === audioFx) startCurrent(true);
+    else toast(L("cantPlay"));
+  };
+}
 if ("mediaSession" in navigator) {
-  navigator.mediaSession.setActionHandler("play", () => audio.play());
+  navigator.mediaSession.setActionHandler("play", togglePlay);
   navigator.mediaSession.setActionHandler("pause", () => audio.pause());
   navigator.mediaSession.setActionHandler("nexttrack", () => step(1));
   navigator.mediaSession.setActionHandler("previoustrack", () => step(-1));
 }
+
+// ---------- updates ----------
+const cmpVer = (a, b) => {
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  return 0;
+};
+async function checkUpdates() {
+  const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const rel = await r.json();
+  const version = String(rel.tag_name || "").replace(/^v/, "");
+  const apk = (rel.assets || []).find((x) => /\.apk$/i.test(x.name));
+  state.update = version && cmpVer(version, APP_VERSION) > 0 ? { version, url: apk?.browser_download_url || rel.html_url, page: rel.html_url } : null;
+  $("#gear")?.classList.toggle("dot", !!state.update);
+  return state.update;
+}
+async function autoCheckUpdates() {
+  if (!settings.autoUpdate) return;
+  try {
+    const u = await checkUpdates();
+    // announce each new version once; the dot on the settings button stays until updated
+    if (u && store("update_seen") !== u.version) { toast(L("newVersion", { v: u.version }), 4000); store("update_seen", u.version); }
+  } catch {}
+}
+
+// ---------- settings ----------
+async function renderSettings() {
+  setChrome({ sub: true, tab: null });
+  const opt = (v, label, sel) => `<option value="${esc(v)}" ${sel ? "selected" : ""}>${esc(label)}</option>`;
+  const sw = (id, on, dis = false) => `<input type="checkbox" class="switch" id="${id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""} />`;
+  const presets = Object.keys(EQ_PRESETS);
+  view.innerHTML = `
+    <div class="head"><div class="head-row"><h1>${esc(L("settings"))}</h1></div></div>
+
+    <section class="group">
+      <h3>${esc(L("language"))}</h3>
+      <div class="rows">
+        <label class="row"><span class="lbl">${esc(L("language"))}</span>
+          <span class="select-wrap"><select class="select" id="s-lang">
+            ${opt("auto", L("langAuto"), settings.lang === "auto")}
+            ${Object.entries(LANG_NAMES).map(([k, n]) => opt(k, n, settings.lang === k)).join("")}
+          </select></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3>${esc(L("eq"))}</h3>
+      <div class="rows ${settings.eqOn ? "" : "eq-off"}" id="eq-rows">
+        <label class="row"><span class="lbl">${esc(L("eqEnable"))}</span>${sw("s-eq", settings.eqOn, !NATIVE)}</label>
+        <div class="row col">
+          <div class="chips eq-presets" id="s-presets">
+            ${presets.map((p) => `<button class="chip ${settings.eqPreset === p ? "on" : ""}" data-p="${p}">${esc((I18N[LANG].eqPresets || I18N.en.eqPresets)[p] || p)}</button>`).join("")}
+          </div>
+          ${EQ_FREQS.map((f, i) => `
+            <div class="eq-band">
+              <span>${f >= 1000 ? f / 1000 + " kHz" : f + " Hz"}</span>
+              <input type="range" min="-12" max="12" step="1" value="${settings.eqGains[i]}" data-b="${i}" aria-label="${f} Hz" />
+              <span id="eqv-${i}">${fmtDb(settings.eqGains[i])}</span>
+            </div>`).join("")}
+        </div>
+      </div>
+      ${NATIVE ? "" : `<div class="note">${esc(L("eqOnlyApp"))}</div>`}
+    </section>
+
+    <section class="group">
+      <h3>${esc(L("playback"))}</h3>
+      <div class="rows">
+        <label class="row"><span class="lbl">${esc(L("autoplay"))}</span>${sw("s-autoplay", settings.autoplay)}</label>
+        <div class="row col"><span class="lbl">${esc(L("speed"))}</span>
+          <div class="chips" id="s-speed" style="padding-bottom:0">
+            ${SPEEDS.map((s) => `<button class="chip ${settings.speed === s ? "on" : ""}" data-s="${s}">${s}×</button>`).join("")}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3>${esc(L("appearance"))}</h3>
+      <div class="rows">
+        <label class="row"><span class="lbl">${esc(L("compactGrid"))}</span>${sw("s-compact", settings.compact)}</label>
+        <label class="row"><span class="lbl">${esc(L("reduceMotion"))}</span>${sw("s-motion", settings.reduceMotion)}</label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3>${esc(L("storage"))}</h3>
+      <div class="rows">
+        <div class="row"><span class="lbl" id="s-cache">…</span><button class="btn ghost" id="s-clear">${esc(L("clearCache"))}</button></div>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3>${esc(L("updates"))}</h3>
+      <div class="rows">
+        <div class="row">
+          <span class="lbl">${esc(L("version", { v: APP_VERSION }))}<small id="s-upd-status">${state.update ? esc(L("updateAvailable", { v: state.update.version })) : ""}</small></span>
+          <button class="btn ${state.update ? "" : "ghost"}" id="s-upd">${esc(state.update ? L("download") : L("checkUpdates"))}</button>
+        </div>
+        <label class="row"><span class="lbl">${esc(L("autoUpdates"))}</span>${sw("s-autoupd", settings.autoUpdate)}</label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3>${esc(L("about"))}</h3>
+      <div class="rows">
+        <a class="row" href="https://github.com/${REPO}" target="_blank" rel="noopener"><span class="lbl">${esc(L("sourceCode"))}</span></a>
+        <a class="row" href="https://artistgrid.cx" target="_blank" rel="noopener"><span class="lbl">${esc(L("website"))}</span></a>
+      </div>
+      <div class="note">${esc(L("disclaimer"))}</div>
+    </section>`;
+  enter();
+
+  const bind = (id, key, after) => { $(id).onchange = (e) => { settings[key] = e.target.checked; saveSettings(); after?.(); }; };
+  $("#s-lang").onchange = (e) => { settings.lang = e.target.value; saveSettings(); setLanguage(); renderSettings(); };
+  bind("#s-eq", "eqOn", () => { $("#eq-rows").classList.toggle("eq-off", !settings.eqOn); applyEq(); });
+  bind("#s-autoplay", "autoplay");
+  bind("#s-compact", "compact", applyLook);
+  bind("#s-motion", "reduceMotion", applyLook);
+  bind("#s-autoupd", "autoUpdate");
+
+  const showGains = () => settings.eqGains.forEach((g, i) => {
+    $(`[data-b="${i}"]`).value = g; $(`#eqv-${i}`).textContent = fmtDb(g);
+  });
+  $("#s-presets").onclick = (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    settings.eqPreset = b.dataset.p; settings.eqGains = [...EQ_PRESETS[b.dataset.p]];
+    $("#s-presets").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c === b));
+    saveSettings(); showGains(); applyEq();
+  };
+  view.querySelectorAll(".eq-band input").forEach((r) => {
+    r.oninput = () => {
+      settings.eqGains[r.dataset.b] = +r.value; settings.eqPreset = "custom";
+      $(`#eqv-${r.dataset.b}`).textContent = fmtDb(+r.value);
+      $("#s-presets").querySelectorAll(".chip").forEach((c) => c.classList.remove("on"));
+      applyEq();
+    };
+    r.onchange = saveSettings;
+  });
+  $("#s-speed").onclick = (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    settings.speed = +b.dataset.s; saveSettings();
+    audio.playbackRate = settings.speed;
+    $("#s-speed").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c === b));
+  };
+
+  const showCache = async () => { $("#s-cache").textContent = L("cacheInfo", { n: await idb.count() }); };
+  showCache();
+  $("#s-clear").onclick = async () => { await idb.clear(); showCache(); toast(L("cacheCleared")); };
+
+  const upd = $("#s-upd"), status = $("#s-upd-status");
+  upd.onclick = async () => {
+    if (state.update) return openExternal(state.update.url);
+    upd.disabled = true; upd.textContent = L("checking"); status.textContent = "";
+    try {
+      const u = await checkUpdates();
+      status.textContent = u ? L("updateAvailable", { v: u.version }) : L("upToDate");
+      upd.textContent = u ? L("download") : L("checkUpdates");
+      upd.classList.toggle("ghost", !u);
+    } catch {
+      status.textContent = L("updateError"); upd.textContent = L("checkUpdates");
+    }
+    upd.disabled = false;
+  };
+}
+const fmtDb = (g) => (g > 0 ? "+" : "") + g + " dB";
 
 // ---------- external links ----------
 function openExternal(url) {
@@ -598,10 +828,18 @@ function openExternal(url) {
 function route() {
   const h = location.hash.replace(/^#\/?/, "");
   const parts = h.split("/").map(decodeURIComponent);
-  if (!document.body.classList.contains("in-artist") && view.querySelector("#grid")) state.homeScroll = { filter: state.filter, y: window.scrollY };
+  if (!document.body.classList.contains("in-sub") && view.querySelector("#grid")) state.homeScroll = { filter: state.filter, y: window.scrollY };
   window.scrollTo(0, 0);
+  document.body.classList.remove("scrolled");
+  view.classList.remove("searching");
+  state.artistName = "";
   if (parts[0] === "a" && parts[1]) renderArtist(parts[1], parts[2]);
+  else if (parts[0] === "settings") renderSettings();
   else renderHome(FILTER_ROUTES[parts[0]] ? parts[0] : "all");
 }
+
+setLanguage();
+applyLook();
 window.addEventListener("hashchange", route);
 route();
+setTimeout(autoCheckUpdates, 1500);

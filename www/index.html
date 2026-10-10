@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
+  <meta name="referrer" content="no-referrer" />
   <title>ArtistGrid</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -12,7 +13,7 @@
 
   <div id="player" class="glass" hidden>
     <div class="p-row">
-      <img id="p-cover" alt="" />
+      <div class="thumb" id="p-thumb"><img id="p-cover" alt="" /></div>
       <div class="p-meta">
         <div id="p-title"></div>
         <div id="p-sub"></div>
@@ -22,8 +23,10 @@
       <button id="p-next" class="icon-btn" data-i18n-aria="next"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
     </div>
     <div id="p-progress"><div id="p-bar"></div></div>
-    <audio id="audio" preload="none"></audio>
   </div>
+  <!-- fx: streamed through the in-app proxy so the equalizer can process it; raw: direct fallback -->
+  <audio id="audio-fx" preload="none"></audio>
+  <audio id="audio-raw" preload="none"></audio>
 
   <nav id="dock">
     <button id="back" class="glass dock-btn" data-i18n-aria="back">
@@ -52,6 +55,7 @@
 
   <div id="toast" class="glass" hidden></div>
 
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

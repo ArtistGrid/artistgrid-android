@@ -7,8 +7,8 @@ android {
         applicationId "cx.artistgrid.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 3
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,7 +16,21 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // CI writes the key from the SIGNING_KEYSTORE secret here, so every build is signed with the
+    // same key and a new APK installs as an update. Without it, the default debug key is used.
+    def stableKey = file('artistgrid.keystore')
+    signingConfigs {
+        stable {
+            storeFile stableKey
+            storePassword System.getenv('SIGNING_PASSWORD')
+            keyAlias System.getenv('SIGNING_ALIAS') ?: 'artistgrid'
+            keyPassword System.getenv('SIGNING_PASSWORD')
+        }
+    }
     buildTypes {
+        debug {
+            if (stableKey.exists() && System.getenv('SIGNING_PASSWORD')) signingConfig signingConfigs.stable
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

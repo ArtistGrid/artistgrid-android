@@ -1,13 +1,18 @@
-A redesign of the interface, plus support for your phone's language.
+Settings, an equalizer, update checks and a smoother interface.
 
 ### What's new
-- **Bottom navigation with a "liquid glass" look**: the top bar is gone. A floating glass tab bar at the bottom (Artists, Top, Updated, Favorites) keeps everything within thumb reach, with a glass lens that slides to the active tab.
-- **Glass mini-player** that floats above the tab bar, with matching glass buttons, chips, badges and notifications across the whole app.
-- **Back button in the bottom bar** when you are inside an artist, and the ♥ favorite button now sits next to the artist's name.
-- **Your phone's language**: the app now follows the device language — English, Italiano, Español, Français, Deutsch and Português (other languages fall back to English). Dates and plurals follow your language too.
-- Going back to the artist grid now keeps your scroll position.
+- **Settings** (gear button next to the title): language, equalizer, playback, appearance, offline storage and updates, all in one place.
+- **Equalizer**: 5 bands (60 Hz – 14 kHz) with presets (Flat, Bass boost, Vocals, Treble, Loudness) or your own curve.
+- **Choose the language**: follow the device language or pick English, Italiano, Español, Français, Deutsch or Português.
+- **Playback options**: autoplay the next track on/off and playback speed (0.75× – 1.5×).
+- **Update checks**: Settings shows when a new version is out and downloads it in one tap; the app can also check at startup.
+- **Title and search stay visible** while you scroll, in the artist grid and in an artist's tracks (with the track filters). Searching hides the artist info so results start right away.
+- **More covers load**: if an artist photo or an era cover fails, the app retries it through the app itself (no referrer) and tries alternative names. Covers that really don't exist show a colored placeholder instead of an empty box.
+- **Smoother animations**: heavy blur is now used only on the floating bars, off-screen artists and tracks are skipped while scrolling, covers fade in, and pages slide in gently. A "Reduce animations" switch is in Settings.
+- **Appearance**: optional compact artist grid.
+- Offline cache can be cleared from Settings.
 
 ### Installation
 Download **ArtistGrid.apk** below, open it on your phone and allow installation from unknown sources. Requires Android 6.0+.
 
-> Debug build, not signed for the Play Store. If v1.0.0 is installed, uninstall it first: this build is signed with a different debug key, so Android won't install it as an update (your saved favorites will be reset). Playback may stop when the screen is off.
+> Debug build, not signed for the Play Store. If Android refuses to install it over the version you have, uninstall the old one first (your saved favorites will be reset). Playback may stop when the screen is off.

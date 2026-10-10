@@ -9,7 +9,9 @@ Browse artists, explore trackers era by era and listen to tracks right from your
 
 - **Artist grid**: 580+ artists with photos and instant search.
 - **Bottom navigation**: a floating "liquid glass" tab bar (Artists, Top, Updated, Favorites) within thumb reach, with a glass mini-player above it.
-- **Device language**: the interface follows the phone's language (English, Italiano, Español, Français, Deutsch, Português; English is the fallback).
+- **Language**: the interface follows the phone's language (English, Italiano, Español, Français, Deutsch, Português; English is the fallback), or can be picked in Settings.
+- **Settings**: 5-band equalizer with presets, autoplay and playback speed, compact grid, reduced animations, offline cache and update checks.
+- **Sticky header**: the title and search stay visible while scrolling artists and tracks.
 - **Full trackers**: every tab (Unreleased, Released, Recent, Best Of, Stems…), with eras, cover art, descriptions and stats.
 - **Track details**: quality, available length, leak date, credits, notes and links.
 - **Track search**: search the whole tracker by title, notes or era, with *Playable*, *Full* and *Snippet* filters.
@@ -37,6 +39,22 @@ It is a [Capacitor](https://capacitorjs.com) app: the interface is plain HTML/CS
 | Audio | pillows.su, pixeldrain and Google Drive links, resolved the same way as on the site |
 
 Requests go through Capacitor's native HTTP client (`CapacitorHttp`), so the app does not depend on CORS rules. Downloaded trackers are stored in IndexedDB for offline use.
+
+Audio and covers that fail to load directly are requested through `/_proxy?u=<url>`, which [`ProxyWebViewClient`](android/app/src/main/java/cx/artistgrid/app/ProxyWebViewClient.java) serves natively (no referrer, Range requests forwarded). Because proxied audio is same-origin, the Web Audio equalizer can process it.
+
+## Builds and releases
+
+Every push builds a debug APK with GitHub Actions (`.github/workflows/build-apk.yml`). Running the workflow manually with a version (e.g. `1.2.0`) also publishes a GitHub release with `ArtistGrid.apk` and the notes in `.github/release-notes.md`; the app's update check reads the latest release.
+
+To sign every build with the same key (so new versions install as updates), add these repository secrets:
+
+| Secret | Value |
+| --- | --- |
+| `SIGNING_KEYSTORE` | the keystore file, base64-encoded (`base64 -w0 my.keystore`) |
+| `SIGNING_PASSWORD` | the keystore and key password |
+| `SIGNING_ALIAS` | the key alias (defaults to `artistgrid`) |
+
+Create a keystore with `keytool -genkeypair -keystore my.keystore -alias artistgrid -keyalg RSA -keysize 2048 -validity 10000`.
 
 ## Building from source
 

@@ -32,8 +32,17 @@ jobs:
       - name: Sync web assets into the Android project
         run: npx cap sync android
 
+      - name: Restore signing key
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+        if: env.SIGNING_KEYSTORE != ''
+        run: echo "$SIGNING_KEYSTORE" | base64 -d > android/app/artistgrid.keystore
+
       - name: Build debug APK
         working-directory: android
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.SIGNING_ALIAS }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon

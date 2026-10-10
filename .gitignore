@@ -8,3 +8,5 @@ android/.idea/
 android/capacitor-cordova-android-plugins/build/
 *.iml
 .DS_Store
+*.keystore
+*.jks
