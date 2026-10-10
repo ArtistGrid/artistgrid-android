@@ -3,6 +3,11 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.1.0). Leave empty to only build the APK."
+        required: false
+        default: ""
 
 jobs:
   build:
@@ -38,3 +43,29 @@ jobs:
         with:
           name: ArtistGrid-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  # Run manually (Actions → Build APK → Run workflow) with a version such as 1.1.0
+  # to publish a GitHub release with the APK attached.
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ArtistGrid-apk
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          mv app-debug.apk ArtistGrid.apk
+          gh release create "v$VERSION" ArtistGrid.apk \
+            --target "$GITHUB_SHA" \
+            --title "ArtistGrid v$VERSION" \
+            --notes-file .github/release-notes.md
