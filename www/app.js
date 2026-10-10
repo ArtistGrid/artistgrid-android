@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -37,7 +37,7 @@ const SPEEDS = [0.75, 1, 1.25, 1.5];
 const DEFAULTS = {
   lang: "auto", eqOn: false, eqPreset: "flat", eqGains: [0, 0, 0, 0, 0],
   autoplay: true, speed: 1, compact: false, reduceMotion: false, autoUpdate: true,
-  theme: "dark", bgPlay: true, shuffle: false, repeat: "off",
+  theme: "dark", bgPlay: true, shuffle: false, repeat: "off", haptics: true,
 };
 const settings = { ...DEFAULTS, ...(store("settings") || {}) };
 const saveSettings = () => store("settings", settings);
@@ -82,6 +82,8 @@ function enter(el = view) {
 }
 
 const favs = new Set(store("favs") || []);
+// short vibration on taps (Android); off in Settings → Appearance
+const haptic = (ms = 8) => { if (settings.haptics) try { navigator.vibrate?.(ms); } catch {} };
 const saveFavs = () => store("favs", [...favs]);
 
 // Large tracker JSON (several MB) lives in IndexedDB for offline use.
@@ -498,6 +500,34 @@ function normalizeEras(d, fallbackName = "") {
   return (groups || []).map((g, i) => ({ ...g, i, tracks: (g.tracks || []).map(normTrack) }));
 }
 
+// ---------- era covers shared across tabs ----------
+// Tabs such as "Best Of" or "Recent" often list eras without their cover, while the main tab
+// has it. Covers seen in any tab are remembered per artist (also under the era name without
+// version tags like "[V2]") and reused wherever the same era shows up.
+const eraCovers = store("era_covers") || {};
+const eraBase = (n) => nameKey(String(n).replace(/\[.*?\]|\(.*?\)|\bv\d+\b/gi, ""));
+function rememberEras(artist, eras) {
+  const m = (eraCovers[nameKey(artist)] ||= {});
+  let changed = false;
+  for (const e of eras) {
+    if (!e.cover_art) continue;
+    for (const k of [nameKey(e.name), eraBase(e.name)]) {
+      if (k && !m[k]) { m[k] = { cover: e.cover_art, color: e.color }; changed = true; }
+    }
+  }
+  if (changed) store("era_covers", eraCovers);
+}
+function fillEraCovers(artist, eras) {
+  const m = eraCovers[nameKey(artist)] || {};
+  let filled = 0;
+  for (const e of eras) {
+    if (e.cover_art) continue;
+    const hit = m[nameKey(e.name)] || m[eraBase(e.name)];
+    if (hit) { e.cover_art = hit.cover; e.color ||= hit.color; filled++; }
+  }
+  return filled;
+}
+
 const TRACK_FILTERS = ["all", "play", "full", "snippet"];
 const FILTER_LABELS = { all: "fAll", play: "fPlay", full: "fFull", snippet: "fSnippet" };
 
@@ -542,6 +572,7 @@ async function renderArtist(name, tabSlug) {
     saveFavs();
     fav.classList.toggle("on", favs.has(a.name));
     fav.classList.remove("pop"); void fav.offsetWidth; fav.classList.add("pop");
+    haptic(12);
     toast(L(favs.has(a.name) ? "favAdded" : "favRemoved"));
   };
 
@@ -598,6 +629,16 @@ async function loadSection(a, ui) {
   state.tracker = d;
   const tabName = (d.tabs || []).find((t) => t.slug === (d.tab?.slug || ui.tab))?.name || d.tab?.name || "";
   const eras = normalizeEras(d, tabName);
+  rememberEras(a.name, eras);
+  fillEraCovers(a.name, eras);
+  // a side tab opened before the main one: load the main tab quietly to learn the era covers
+  if (ui.tab && eras.some((e) => !e.cover_art) && !ui.mainLoaded) {
+    ui.mainLoaded = true;
+    cachedJson(TRACKER_API + `/sh/${a.url}/`, "t:" + a.url + ":").then((r) => {
+      rememberEras(a.name, normalizeEras(r.data));
+      if (fillEraCovers(a.name, eras) && ui.token === token && !ui.q && ui.f === "all") ui.draw();
+    }).catch(() => {});
+  }
   const all = [];
   for (const e of eras) for (const t of e.tracks) all.push({ t, e });
   const curTab = d.tab?.slug || ui.tab || "";
@@ -665,15 +706,24 @@ async function loadSection(a, ui) {
           (e.tracks.length ? "" : `<div class="state">${esc(L("noTracks"))}</div>`);
         appendTracks(eb, e.tracks.map((t) => ({ t, e })), false);
       }
+      // bring the opened era up under the header
+      if (el.classList.contains("open")) {
+        const top = el.getBoundingClientRect().top - ($(".head")?.offsetHeight || 0) - 8;
+        if (top > window.innerHeight * 0.4 || top < 0) window.scrollBy({ top, behavior: settings.reduceMotion ? "auto" : "smooth" });
+      }
+      haptic();
       return;
     }
     const more = ev.target.closest(".more");
     if (more) { more._next(); return; }
-    const playBtn = ev.target.closest(".play");
-    if (playBtn) { playItem(playBtn.closest(".track")._item, playBtn.closest(".era-body, #list")); return; }
     if (ev.target.closest("a")) return;
     const tr = ev.target.closest(".track");
-    if (tr) tr.classList.toggle("expanded");
+    if (!tr) return;
+    // the info button (or a row that can't play) opens the details; anywhere else plays the track
+    if (ev.target.closest(".info") || !playableUrl(tr._item.t)) { tr.classList.toggle("expanded"); return; }
+    haptic();
+    if (cur()?.t === tr._item.t) togglePlay();
+    else playItem(tr._item, tr.closest(".era-body, #list"));
   };
 
   ui.draw();
@@ -732,6 +782,7 @@ function trackEl(item, showEra) {
   const playable = !!playableUrl(t);
   const on = cur() && cur().t === t;
   if (on) el.classList.add("playing");
+  if (playable) el.classList.add("can-play");
   const tags = [
     t.available_length && `<span class="tag">${esc(t.available_length)}</span>`,
     t.quality && `<span class="tag ${qualityClass(t.quality)}">${esc(t.quality)}</span>`,
@@ -752,7 +803,8 @@ function trackEl(item, showEra) {
       ${tags ? `<div class="meta">${tags}</div>` : ""}
       ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ""}
       ${links ? `<div class="lnk">${links}</div>` : ""}
-    </div>`;
+    </div>
+    ${t.notes || links || credits.length > 60 ? `<button class="info icon-btn" aria-label="${esc(L("details"))}"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>` : ""}`;
   return el;
 }
 
@@ -831,7 +883,8 @@ function applyEq() {
 }
 
 const trackTitle = (t) => t.name?.title || t.name?.raw || "";
-const coverList = (it) => [...eraImgs(it.e, it.artist), ...artistImgs(it.artist)];
+// the album (era) cover only: when none exists the placeholder shows the era name, never the artist photo
+const coverList = (it) => eraImgs(it.e, it.artist);
 const fmtTime = (s) => {
   if (!isFinite(s) || s < 0) return "0:00";
   s = Math.floor(s);
@@ -850,7 +903,7 @@ function useElement(el) {
   if (audio !== el) { audio.pause(); audio = el; }
 }
 
-function startCurrent(direct = false) {
+function startCurrent(direct = false, autoplay = true) {
   const it = cur(); if (!it) return;
   const { t, e } = it;
   const title = trackTitle(t);
@@ -860,12 +913,13 @@ function startCurrent(direct = false) {
   if (eq.ctx?.state === "suspended") eq.ctx.resume();
   audio.src = audio === audioFx ? proxied(url) : url;
   audio.playbackRate = settings.speed;
-  audio.play().catch(() => {});
+  if (autoplay) audio.play().catch(() => {});
   $("#player").hidden = false;
   document.body.classList.add("has-player");
   $("#p-title").textContent = title;
   $("#p-sub").textContent = `${it.artist} · ${e.name}`;
   $("#p-thumb").setAttribute("style", phStyle(e.name, e.color));
+  $("#p-thumb").dataset.initial = (String(e.name).trim()[0] || "♪").toUpperCase();
   setImg($("#p-cover"), coverList(it));
   bar.style.transform = "scaleX(0)";
   document.querySelectorAll(".track").forEach((el) => {
@@ -874,11 +928,34 @@ function startCurrent(direct = false) {
     el.querySelector(".play")?.classList.toggle("on", on);
   });
   if ("mediaSession" in navigator) {
-    const art = e.cover_art || artistImgs(it.artist)[0];
+    const art = e.cover_art;
     navigator.mediaSession.metadata = new MediaMetadata({ title, artist: it.artist, album: e.name, artwork: art ? [{ src: art, sizes: "512x512" }] : [] });
   }
   if (npIsOpen()) renderNowPlaying();
-  syncNative();
+  if (autoplay) syncNative();
+  saveSession();
+}
+
+// ---------- resume where you left off ----------
+// The current track and the next ones are saved, so the mini-player is back (paused) on the
+// next launch and continues from the same point.
+let pendingSeek = 0, sessionSaved = 0;
+function saveSession() {
+  const it = cur(); if (!it) return;
+  const slim = (x) => ({ artist: x.artist, t: { name: x.t.name, links: x.t.links }, e: { name: x.e.name, cover_art: x.e.cover_art, color: x.e.color } });
+  store("last_session", {
+    queue: state.queue.slice(state.qIndex, state.qIndex + 100).map(slim),
+    position: audio.currentTime || pendingSeek || 0,
+  });
+  sessionSaved = Date.now();
+}
+function restoreSession() {
+  const s = store("last_session");
+  if (!s?.queue?.length || !playableUrl(s.queue[0].t)) return;
+  state.queue = s.queue;
+  state.qIndex = 0;
+  pendingSeek = s.position || 0;
+  startCurrent(false, false);
 }
 
 // Next track: honours repeat-one (only when a track ends by itself), shuffle and repeat.
@@ -918,14 +995,45 @@ function prevTrack() {
 }
 
 const togglePlay = () => {
+  haptic();
   if (eq.ctx?.state === "suspended") eq.ctx.resume();
   audio.paused ? audio.play().catch(() => {}) : audio.pause();
 };
 $("#p-play").onclick = togglePlay;
 $("#p-next").onclick = () => nextTrack();
 $("#p-prev").onclick = prevTrack;
-$("#p-open").onclick = () => openNowPlaying();
-$("#p-thumb").onclick = () => openNowPlaying();
+$("#p-open").onclick = () => { if (!miniSwiped) openNowPlaying(); };
+$("#p-thumb").onclick = () => { if (!miniSwiped) openNowPlaying(); };
+
+// swipe the mini-player left / right to skip tracks
+let miniSwiped = false;
+(() => {
+  const el = $("#player");
+  let x0 = null, dx = 0;
+  el.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".icon-btn")) return;
+    x0 = e.clientX; dx = 0; miniSwiped = false;
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (x0 === null) return;
+    dx = e.clientX - x0;
+    if (Math.abs(dx) > 8) {
+      // only once it is a swipe: keep following the finger outside the bar (a plain tap still opens the player)
+      if (!miniSwiped) try { el.setPointerCapture(e.pointerId); } catch {}
+      miniSwiped = true; el.style.transition = "none"; el.style.transform = `translateX(${dx * 0.6}px)`; el.style.opacity = String(1 - Math.min(Math.abs(dx) / 400, 0.4));
+    }
+  });
+  const end = () => {
+    if (x0 === null) return;
+    x0 = null;
+    el.style.transition = "transform .35s var(--spring), opacity .25s";
+    el.style.transform = ""; el.style.opacity = "";
+    if (Math.abs(dx) > 70) { haptic(); dx < 0 ? nextTrack() : prevTrack(); }
+    setTimeout(() => (miniSwiped = false), 50);
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+})();
 $("#p-progress").onclick = (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   if (audio.duration) audio.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left - 18) / (r.width - 36))) * audio.duration;
@@ -936,6 +1044,7 @@ for (const el of [audioFx, audioRaw]) {
   el.ontimeupdate = () => {
     if (el !== audio) return;
     bar.style.transform = `scaleX(${el.duration ? el.currentTime / el.duration : 0})`;
+    if (Date.now() - sessionSaved > 10000) saveSession();
     if (npIsOpen()) updateSeek();
   };
   el.onplay = () => {
@@ -949,8 +1058,14 @@ for (const el of [audioFx, audioRaw]) {
     playIcon.setAttribute("d", PLAY_D); $("#np-play-icon").setAttribute("d", PLAY_D);
     document.body.classList.remove("is-playing");
     syncNative();
+    saveSession();
   };
-  el.onloadedmetadata = el.onseeked = el.onratechange = () => { if (el === audio) { syncNative(); if (npIsOpen()) updateSeek(); } };
+  el.onloadedmetadata = el.onseeked = el.onratechange = (ev) => {
+    if (el !== audio) return;
+    if (ev.type === "loadedmetadata" && pendingSeek) { el.currentTime = Math.min(pendingSeek, (el.duration || pendingSeek) - 1); pendingSeek = 0; }
+    syncNative();
+    if (npIsOpen()) updateSeek();
+  };
   el.onended = () => { if (el === audio && settings.autoplay) nextTrack(true); };
   el.onerror = () => {
     if (el !== audio || !el.getAttribute("src")) return;
@@ -1032,6 +1147,7 @@ function renderNowPlaying() {
   $("#np-artist").textContent = it.artist;
   $("#np-era").textContent = it.e.name;
   $("#np-thumb").setAttribute("style", phStyle(it.e.name, it.e.color));
+  $("#np-thumb").dataset.initial = (String(it.e.name).trim()[0] || "♪").toUpperCase();
   setImg($("#np-cover"), coverList(it));
   setImg($("#np-bg-img"), coverList(it));
   $("#np-fav").classList.toggle("on", favs.has(it.artist));
@@ -1050,7 +1166,7 @@ function updateSeek() {
   const seek = $("#np-seek");
   seek.value = v;
   seek.style.setProperty("--pct", v / 10 + "%");
-  $("#np-cur").textContent = fmtTime(c);
+  $("#np-cur").textContent = fmtTime(c || pendingSeek);
   $("#np-dur").textContent = fmtTime(d);
 }
 function renderQueue() {
@@ -1249,6 +1365,7 @@ async function renderSettings() {
         </label>
         <label class="row"><span class="lbl">${esc(L("compactGrid"))}</span>${sw("s-compact", settings.compact)}</label>
         <label class="row"><span class="lbl">${esc(L("reduceMotion"))}</span>${sw("s-motion", settings.reduceMotion)}</label>
+        <label class="row"><span class="lbl">${esc(L("haptics"))}</span>${sw("s-haptics", settings.haptics)}</label>
       </div>
     </section>
 
@@ -1284,6 +1401,7 @@ async function renderSettings() {
   $("#s-lang").onchange = (e) => { settings.lang = e.target.value; saveSettings(); setLanguage(); renderSettings(); };
   bind("#s-eq", "eqOn", () => { $("#eq-rows").classList.toggle("eq-off", !settings.eqOn); applyEq(); });
   bind("#s-autoplay", "autoplay");
+  bind("#s-haptics", "haptics", () => haptic(15));
   bind("#s-bgplay", "bgPlay", () => (settings.bgPlay ? syncNative() : native("stop")));
   $("#s-theme").onchange = (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(true); };
   bind("#s-compact", "compact", applyLook);
@@ -1360,6 +1478,7 @@ function route() {
 setLanguage();
 applyLook();
 applyTheme();
+restoreSession();
 window.addEventListener("hashchange", route);
 route();
 setTimeout(autoCheckUpdates, 1500);

@@ -310,6 +310,17 @@ body.is-playing .track .play.on .bars i { animation: bar 1s ease-in-out infinite
 .bars i:nth-child(3) { animation-delay: -.7s !important; }
 @keyframes bar { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
 .track .body { flex: 1; min-width: 0; }
+.track.can-play { cursor: pointer; }
+.track.can-play:active { background: rgba(var(--ink),.06); }
+/* long credit lists stay to two lines until the details are opened */
+.track .cr { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.track.expanded .cr { display: block; -webkit-line-clamp: unset; }
+.track .info { width: 34px; height: 34px; margin: 1px -6px 0 0; color: var(--muted); }
+.track .info svg { width: 18px; height: 18px; transition: transform .35s var(--spring); }
+.track.expanded .info svg { transform: rotate(180deg); }
+/* era initial on cover placeholders (player) */
+.thumb[data-initial]::before { content: attr(data-initial); font-size: .9em; }
+.thumb img.loaded ~ *, .thumb:has(img.loaded)::before { visibility: hidden; }
 .track .tt { font-weight: 600; line-height: 1.25; word-break: break-word; }
 .track .cr { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-word; }
 .track .meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }

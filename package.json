@@ -1,6 +1,6 @@
 {
   "name": "artistgrid-android",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Unofficial Android app for ArtistGrid: browse and listen to unreleased music trackers.",
   "scripts": {
     "sync": "cap sync android",

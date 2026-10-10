@@ -1,13 +1,17 @@
-A full-screen player, background playback and a light theme.
+Album covers in the player and a friendlier app.
 
-### What's new
-- **Full-screen player**: tap the mini-player to open it. Big cover on a blurred backdrop, seek bar with times, shuffle, repeat (all / one), playback speed, a shortcut to the equalizer and the list of upcoming tracks (tap one to jump to it). Swipe down, tap the arrow or use Back to close it; tap the artist to open their page.
-- **Choose the audio output**: the device button in the player opens Android's output picker (phone speaker, Bluetooth, headphones) and shows what is playing the sound right now.
-- **Background playback**: music keeps playing with the screen off or while you use other apps. A media notification, the lock screen, Bluetooth and headset buttons all control playback. It can be turned off in Settings → Playback.
-- **Light theme**: switch between light and dark with the new button next to the ArtistGrid title, or pick System / Dark / Light in Settings → Appearance. The status and navigation bars follow the theme.
-- Shuffle and repeat are remembered between sessions.
+### Fixed
+- **The right cover in the player**: the player, the notification and the queue showed the artist's photo when the era had no cover in the current tab (e.g. *Best Of*). The app now remembers era covers from every tab of the artist, also across versions such as "Yandhi [V2]" → "Yandhi", so the album cover shows up everywhere. When an era really has no cover, a coloured placeholder with its initial is shown instead of the artist's photo.
+
+### Easier to use
+- **Tap a track to play it**: the whole row plays the song (tap again to pause). Notes and links open with the small arrow on the right.
+- **Shorter rows**: long credit lists are cut to two lines until you open the details.
+- **Pick up where you left off**: the last song (and what came next) is back in the mini-player when you reopen the app, ready to continue from the same point.
+- **Swipe the mini-player** left or right to skip to the next or previous song.
+- **Opening an era** scrolls it into view under the header.
+- **Light vibration** on taps (can be turned off in Settings → Appearance).
 
 ### Installation
-Download **ArtistGrid.apk** below, or update from **Settings → Updates** in the app. It installs over v1.2.0 and later and keeps your favorites. On Android 13+ the app asks for permission to show the playback notification. Requires Android 6.0+.
+Update from **Settings → Updates** in the app, or download **ArtistGrid.apk** below. Installs over v1.2.0 and later and keeps your favorites. Requires Android 6.0+.
 
 > Debug build, not signed for the Play Store.
