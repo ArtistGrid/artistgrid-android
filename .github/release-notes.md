@@ -1,8 +1,9 @@
-More equalizer presets and a little surprise.
+Player fixes and working in-app updates.
 
-### What's new
-- **14 equalizer presets**: Flat, Bass boost, Hip-hop, Trap, R&B, Pop, Rock, Electronic, Vocals, Acoustic, Treble, Loudness, Night and Less bass. Pick one in **Settings → Equalizer**, or move the sliders to make your own.
-- **A hidden surprise** on the home screen. Hint: some titles like to be tapped more than once. 📀
+### Fixed
+- **Resume position**: after reopening the app, playing a different track than the one left paused no longer makes it start from the old track's position.
+- **Player cover**: skipping tracks quickly no longer leaves the previous track's album cover in the player.
+- **In-app updates** now check this repository (ArtistGrid/artistgrid-android), and the "Source code" link in Settings points here too.
 
 ### Installation
 Update from **Settings → Updates** in the app, or download **ArtistGrid.apk** below. Installs over the previous version and keeps your favorites. Requires Android 6.0+.
