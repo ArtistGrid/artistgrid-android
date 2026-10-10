@@ -7,6 +7,14 @@
   <meta name="referrer" content="no-referrer" />
   <title>ArtistGrid</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // apply the saved theme before the first paint (no dark→light flash)
+    try {
+      var s = JSON.parse(localStorage.getItem("settings") || "{}"), t = s.theme || "dark";
+      if (t === "system") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <main id="view"></main>
@@ -52,6 +60,45 @@
       </button>
     </div>
   </nav>
+
+  <section id="np" class="np" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="np-bg"><img id="np-bg-img" alt="" /></div>
+    <div class="np-scroll" id="np-scroll">
+      <header class="np-top" id="np-grab">
+        <button id="np-close" class="icon-btn" data-i18n-aria="close"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="np-from"><small data-i18n="playingFrom"></small><b id="np-era"></b></div>
+        <button id="np-go-artist" class="icon-btn" data-i18n-aria="openArtist"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button>
+      </header>
+      <div class="np-cover thumb" id="np-thumb"><img id="np-cover" alt="" /></div>
+      <div class="np-meta">
+        <div class="txt">
+          <h2 id="np-title"></h2>
+          <button class="artist" id="np-artist"></button>
+        </div>
+        <button id="np-fav" class="icon-btn" data-i18n-aria="favorite"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg></button>
+      </div>
+      <div class="np-seek">
+        <input type="range" id="np-seek" min="0" max="1000" value="0" data-i18n-aria="seek" />
+        <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
+      </div>
+      <div class="np-controls">
+        <button id="np-shuffle" class="icon-btn np-toggle" data-i18n-aria="shuffle"><svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+        <button id="np-prev" class="icon-btn" data-i18n-aria="prev"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z" fill="currentColor"/></svg></button>
+        <button id="np-play" class="icon-btn big" data-i18n-aria="playPause"><svg viewBox="0 0 24 24"><path id="np-play-icon" d="M7 4l13 8-13 8z"/></svg></button>
+        <button id="np-next" class="icon-btn" data-i18n-aria="next"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z" fill="currentColor"/></svg></button>
+        <button id="np-repeat" class="icon-btn np-toggle" data-i18n-aria="repeat"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="one" hidden>1</span></button>
+      </div>
+      <div class="np-extra">
+        <button id="np-output" class="np-device"><svg viewBox="0 0 24 24" id="np-output-icon"><rect x="6" y="2" width="12" height="20" rx="3"/><circle cx="12" cy="15" r="3"/><path d="M12 6h.01"/></svg><span id="np-output-name"></span></button>
+        <button id="np-speed" class="chip">1×</button>
+        <button id="np-eq" class="icon-btn round" data-i18n-aria="eq"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
+      </div>
+      <div class="np-queue">
+        <h3 data-i18n="upNext"></h3>
+        <div class="rows" id="np-queue"></div>
+      </div>
+    </div>
+  </section>
 
   <div id="toast" class="glass" hidden></div>
 

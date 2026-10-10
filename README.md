@@ -16,7 +16,9 @@ Browse artists, explore trackers era by era and listen to tracks right from your
 - **Full trackers**: every tab (Unreleased, Released, Recent, Best Of, Stems…), with eras, cover art, descriptions and stats.
 - **Track details**: quality, available length, leak date, credits, notes and links.
 - **Track search**: search the whole tracker by title, notes or era, with *Playable*, *Full* and *Snippet* filters.
-- **Built-in player**: play/pause, previous/next and a progress bar. When a track ends, the next one in the era starts.
+- **Built-in player**: a mini-player above the tab bar that opens a full-screen player with cover, seek bar, shuffle, repeat, playback speed, queue and audio output picker (Bluetooth, headphones, speaker).
+- **Background playback**: music keeps playing with the screen off, with controls in the notification, on the lock screen and on headsets.
+- **Light and dark theme**: switch with the button next to the title, or follow the system in Settings.
 - **Favorites**: save the artists you follow.
 - **Offline use**: trackers you have already opened stay available without a connection, and a copy of the artist list ships with the app.
 - **External links**: artists with their own tracker site (e.g. Frank Ocean) open in the browser.
@@ -36,7 +38,6 @@ How the app works, how to build it from source and how releases are published: s
 
 ## Known limitations
 
-- With the screen off, Android may pause playback (there is no background audio service yet).
 - Only pillows.su, pixeldrain and Google Drive links play in the app; other links open externally.
 - The published APK is a debug build, not signed for the Play Store.
 

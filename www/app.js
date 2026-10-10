@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.4.0";
 const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -37,6 +37,7 @@ const SPEEDS = [0.75, 1, 1.25, 1.5];
 const DEFAULTS = {
   lang: "auto", eqOn: false, eqPreset: "flat", eqGains: [0, 0, 0, 0, 0],
   autoplay: true, speed: 1, compact: false, reduceMotion: false, autoUpdate: true,
+  theme: "dark", bgPlay: true, shuffle: false, repeat: "off",
 };
 const settings = { ...DEFAULTS, ...(store("settings") || {}) };
 const saveSettings = () => store("settings", settings);
@@ -382,6 +383,7 @@ async function renderHome(filter = "all") {
       <div class="head-row">
         <h1>${esc(title)}</h1>
         <span class="count" id="count"></span>
+        <button id="theme-btn" class="icon-btn round" aria-label="${esc(L("themeToggle"))}">${THEME_ICONS[resolvedTheme()]}</button>
         <button id="gear" class="icon-btn round ${state.update ? "dot" : ""}" aria-label="${esc(L("settings"))}">${ICONS.gear}</button>
       </div>
       ${searchBox("q", L("searchArtist"), state.query)}
@@ -390,6 +392,7 @@ async function renderHome(filter = "all") {
   const q = $("#q");
   q.oninput = () => { state.query = q.value; drawGrid(); };
   $("#gear").onclick = () => (location.hash = "#/settings");
+  $("#theme-btn").onclick = toggleTheme;
   $("#grid").onclick = (e) => {
     const c = e.target.closest(".card"); if (!c) return;
     const a = state.artists[c.dataset.i];
@@ -753,6 +756,47 @@ function trackEl(item, showEra) {
   return el;
 }
 
+// ---------- native bridge (Android only) ----------
+// ArtistGridNative (NativePlugin.java): background playback service + media notification,
+// system audio output switcher, current output, system bar colours.
+const NATIVE_API = NATIVE && typeof window.Capacitor?.nativePromise === "function";
+const native = (method, options = {}) =>
+  NATIVE_API ? window.Capacitor.nativePromise("ArtistGridNative", method, options).catch(() => null) : Promise.resolve(null);
+const onNative = (event, cb) => { if (NATIVE_API) window.Capacitor.addListener("ArtistGridNative", event, cb); };
+
+// ---------- theme ----------
+const themeMq = window.matchMedia("(prefers-color-scheme: light)");
+const resolvedTheme = () => (settings.theme === "system" ? (themeMq.matches ? "light" : "dark") : settings.theme);
+const THEME_ICONS = {
+  // shows the theme a tap switches to
+  dark: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  light: '<svg viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>',
+};
+function applyTheme(animate = false) {
+  const t = resolvedTheme(), root = document.documentElement;
+  if (animate && !settings.reduceMotion) {
+    root.classList.add("theme-anim");
+    clearTimeout(applyTheme.t);
+    applyTheme.t = setTimeout(() => root.classList.remove("theme-anim"), 450);
+  }
+  root.dataset.theme = t;
+  const bg = t === "light" ? "#f2f2f7" : "#000000";
+  $('meta[name="theme-color"]').setAttribute("content", bg);
+  native("setBars", { dark: t === "dark", color: bg });
+  const btn = $("#theme-btn");
+  if (btn) btn.innerHTML = THEME_ICONS[t];
+}
+themeMq.addEventListener?.("change", () => { if (settings.theme === "system") applyTheme(true); });
+function toggleTheme() {
+  settings.theme = resolvedTheme() === "dark" ? "light" : "dark";
+  saveSettings();
+  const btn = $("#theme-btn");
+  if (btn && !settings.reduceMotion) {
+    btn.classList.add("spin");
+    setTimeout(() => { applyTheme(true); btn.classList.remove("spin"); }, 180);
+  } else applyTheme(true);
+}
+
 // ---------- player + equalizer ----------
 // Two elements: "fx" plays through the native proxy (same origin) so Web Audio can apply the
 // equalizer; "raw" plays the remote URL directly and is used when the proxy can't serve a track.
@@ -760,6 +804,7 @@ const audioFx = $("#audio-fx"), audioRaw = $("#audio-raw");
 let audio = NATIVE ? audioFx : audioRaw;
 const cur = () => state.queue[state.qIndex];
 const eq = { ctx: null, filters: [] };
+state.history = []; // indexes played before the current one (for Previous and shuffle)
 
 function ensureEq() {
   if (eq.ctx || !NATIVE || !settings.eqOn) return;
@@ -785,9 +830,18 @@ function applyEq() {
   if (eq.ctx?.state === "suspended") eq.ctx.resume();
 }
 
+const trackTitle = (t) => t.name?.title || t.name?.raw || "";
+const coverList = (it) => [...eraImgs(it.e, it.artist), ...artistImgs(it.artist)];
+const fmtTime = (s) => {
+  if (!isFinite(s) || s < 0) return "0:00";
+  s = Math.floor(s);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+};
+
 function playItem(item, container) {
   const items = (container?._items || [item]).filter((x) => playableUrl(x.t)).map((x) => ({ ...x, artist: state.artistName }));
   state.queue = items;
+  state.history = [];
   state.qIndex = Math.max(0, items.findIndex((x) => x.t === item.t));
   startCurrent();
 }
@@ -799,7 +853,7 @@ function useElement(el) {
 function startCurrent(direct = false) {
   const it = cur(); if (!it) return;
   const { t, e } = it;
-  const title = t.name?.title ?? t.name?.raw ?? "";
+  const title = trackTitle(t);
   const url = playableUrl(t);
   useElement(NATIVE && !direct ? audioFx : audioRaw);
   ensureEq();
@@ -811,9 +865,9 @@ function startCurrent(direct = false) {
   document.body.classList.add("has-player");
   $("#p-title").textContent = title;
   $("#p-sub").textContent = `${it.artist} · ${e.name}`;
-  const thumb = $("#p-thumb");
-  thumb.setAttribute("style", phStyle(e.name, e.color));
-  setImg($("#p-cover"), [...eraImgs(e, it.artist), ...artistImgs(it.artist)]);
+  $("#p-thumb").setAttribute("style", phStyle(e.name, e.color));
+  setImg($("#p-cover"), coverList(it));
+  bar.style.transform = "scaleX(0)";
   document.querySelectorAll(".track").forEach((el) => {
     const on = el._item?.t === t;
     el.classList.toggle("playing", on);
@@ -823,11 +877,43 @@ function startCurrent(direct = false) {
     const art = e.cover_art || artistImgs(it.artist)[0];
     navigator.mediaSession.metadata = new MediaMetadata({ title, artist: it.artist, album: e.name, artwork: art ? [{ src: art, sizes: "512x512" }] : [] });
   }
+  if (npIsOpen()) renderNowPlaying();
+  syncNative();
 }
 
-function step(dir) {
-  if (!state.queue.length) return;
-  state.qIndex = (state.qIndex + dir + state.queue.length) % state.queue.length;
+// Next track: honours repeat-one (only when a track ends by itself), shuffle and repeat.
+function nextIndex(auto) {
+  const n = state.queue.length;
+  if (!n) return -1;
+  if (auto && settings.repeat === "one") return state.qIndex;
+  if (settings.shuffle && n > 1) {
+    const played = new Set([...state.history, state.qIndex]);
+    let pool = [...Array(n).keys()].filter((i) => !played.has(i));
+    if (!pool.length) {
+      if (auto && settings.repeat === "off") return -1;
+      state.history = [];
+      pool = [...Array(n).keys()].filter((i) => i !== state.qIndex);
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  if (state.qIndex + 1 < n) return state.qIndex + 1;
+  return auto && settings.repeat === "off" ? -1 : 0;
+}
+function goTo(i) {
+  if (i === state.qIndex) { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+  state.history.push(state.qIndex);
+  if (state.history.length > 500) state.history.shift();
+  state.qIndex = i;
+  startCurrent();
+}
+function nextTrack(auto = false) {
+  const i = nextIndex(auto);
+  if (i < 0) { audio.pause(); return; }
+  goTo(i);
+}
+function prevTrack() {
+  if (audio.currentTime > 3 || !state.queue.length) { audio.currentTime = 0; return; }
+  state.qIndex = state.history.length ? state.history.pop() : (state.qIndex - 1 + state.queue.length) % state.queue.length;
   startCurrent();
 }
 
@@ -836,24 +922,36 @@ const togglePlay = () => {
   audio.paused ? audio.play().catch(() => {}) : audio.pause();
 };
 $("#p-play").onclick = togglePlay;
-// tapping the song in the mini-player opens its artist
-$("#p-open").onclick = () => {
-  const it = cur(); if (!it?.artist) return;
-  const target = "#/a/" + encodeURIComponent(it.artist);
-  if (!location.hash.startsWith(target)) location.hash = target;
-};
-$("#p-next").onclick = () => step(1);
-$("#p-prev").onclick = () => (audio.currentTime > 3 ? (audio.currentTime = 0) : step(-1));
+$("#p-next").onclick = () => nextTrack();
+$("#p-prev").onclick = prevTrack;
+$("#p-open").onclick = () => openNowPlaying();
+$("#p-thumb").onclick = () => openNowPlaying();
 $("#p-progress").onclick = (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   if (audio.duration) audio.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left - 18) / (r.width - 36))) * audio.duration;
 };
+const PLAY_D = "M7 4l13 8-13 8z", PAUSE_D = "M7 4h3v16H7zM14 4h3v16h-3z";
 const playIcon = $("#p-play-icon"), bar = $("#p-bar");
 for (const el of [audioFx, audioRaw]) {
-  el.ontimeupdate = () => { if (el === audio) bar.style.transform = `scaleX(${el.duration ? el.currentTime / el.duration : 0})`; };
-  el.onplay = () => { if (el === audio) { playIcon.setAttribute("d", "M7 4h3v16H7zM14 4h3v16h-3z"); document.body.classList.add("is-playing"); } };
-  el.onpause = () => { if (el === audio) { playIcon.setAttribute("d", "M7 4l13 8-13 8z"); document.body.classList.remove("is-playing"); } };
-  el.onended = () => { if (el === audio && settings.autoplay) step(1); };
+  el.ontimeupdate = () => {
+    if (el !== audio) return;
+    bar.style.transform = `scaleX(${el.duration ? el.currentTime / el.duration : 0})`;
+    if (npIsOpen()) updateSeek();
+  };
+  el.onplay = () => {
+    if (el !== audio) return;
+    playIcon.setAttribute("d", PAUSE_D); $("#np-play-icon").setAttribute("d", PAUSE_D);
+    document.body.classList.add("is-playing");
+    syncNative();
+  };
+  el.onpause = () => {
+    if (el !== audio) return;
+    playIcon.setAttribute("d", PLAY_D); $("#np-play-icon").setAttribute("d", PLAY_D);
+    document.body.classList.remove("is-playing");
+    syncNative();
+  };
+  el.onloadedmetadata = el.onseeked = el.onratechange = () => { if (el === audio) { syncNative(); if (npIsOpen()) updateSeek(); } };
+  el.onended = () => { if (el === audio && settings.autoplay) nextTrack(true); };
   el.onerror = () => {
     if (el !== audio || !el.getAttribute("src")) return;
     // the proxy couldn't stream it: retry the same track directly (without the equalizer)
@@ -864,9 +962,204 @@ for (const el of [audioFx, audioRaw]) {
 if ("mediaSession" in navigator) {
   navigator.mediaSession.setActionHandler("play", togglePlay);
   navigator.mediaSession.setActionHandler("pause", () => audio.pause());
-  navigator.mediaSession.setActionHandler("nexttrack", () => step(1));
-  navigator.mediaSession.setActionHandler("previoustrack", () => step(-1));
+  navigator.mediaSession.setActionHandler("nexttrack", () => nextTrack());
+  navigator.mediaSession.setActionHandler("previoustrack", prevTrack);
 }
+
+// ---------- background playback (native service + notification) ----------
+function coverUrlForNative() {
+  const src = $("#p-cover").getAttribute("src") || "";
+  if (src.startsWith("/_proxy")) return decodeURIComponent(src.split("u=")[1] || "");
+  return /^https?:/.test(src) ? src : null;
+}
+function syncNative() {
+  const it = cur();
+  if (!NATIVE_API || !it || !settings.bgPlay) return;
+  native("update", {
+    title: trackTitle(it.t), artist: it.artist, album: it.e.name, artwork: coverUrlForNative(),
+    playing: !audio.paused, position: audio.currentTime || 0, duration: isFinite(audio.duration) ? audio.duration : 0, speed: settings.speed,
+  });
+}
+$("#p-cover").addEventListener("load", syncNative);
+onNative("action", (d) => {
+  if (!d) return;
+  if (d.action === "play") { if (eq.ctx?.state === "suspended") eq.ctx.resume(); audio.play().catch(() => {}); }
+  else if (d.action === "pause") audio.pause();
+  else if (d.action === "next") nextTrack();
+  else if (d.action === "prev") prevTrack();
+  else if (d.action === "seek" && isFinite(d.position)) audio.currentTime = d.position;
+});
+
+// ---------- full-screen player ----------
+const np = $("#np");
+const npIsOpen = () => np.classList.contains("open");
+let npSeeking = false;
+
+function openNowPlaying() {
+  if (!cur() || npIsOpen()) return;
+  renderNowPlaying();
+  np.classList.add("open");
+  np.setAttribute("aria-hidden", "false");
+  document.body.classList.add("np-open");
+  $("#np-scroll").scrollTop = 0;
+  // an extra history entry, so Back (button or gesture) closes the player first
+  history.pushState({ np: 1 }, "", location.href);
+  showOutput(lastOutput);
+  native("getOutput").then((o) => o && showOutput(o));
+}
+// Resolves once the player is closed and history is back where it was.
+function closeNowPlaying() {
+  return new Promise((resolve) => {
+    if (!npIsOpen()) return resolve();
+    hideNowPlaying();
+    if (history.state?.np) {
+      window.addEventListener("popstate", () => resolve(), { once: true });
+      history.back();
+    } else resolve();
+  });
+}
+function hideNowPlaying() {
+  np.classList.remove("open", "dragging");
+  np.style.transform = "";
+  np.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("np-open");
+}
+window.addEventListener("popstate", () => { if (npIsOpen() && !history.state?.np) hideNowPlaying(); });
+
+function renderNowPlaying() {
+  const it = cur(); if (!it) return;
+  $("#np-title").textContent = trackTitle(it.t);
+  $("#np-artist").textContent = it.artist;
+  $("#np-era").textContent = it.e.name;
+  $("#np-thumb").setAttribute("style", phStyle(it.e.name, it.e.color));
+  setImg($("#np-cover"), coverList(it));
+  setImg($("#np-bg-img"), coverList(it));
+  $("#np-fav").classList.toggle("on", favs.has(it.artist));
+  $("#np-play-icon").setAttribute("d", audio.paused ? PLAY_D : PAUSE_D);
+  $("#np-shuffle").classList.toggle("on", settings.shuffle);
+  $("#np-repeat").classList.toggle("on", settings.repeat !== "off");
+  $("#np-repeat .one").hidden = settings.repeat !== "one";
+  $("#np-speed").textContent = settings.speed + "×";
+  updateSeek();
+  renderQueue();
+}
+function updateSeek() {
+  if (npSeeking) return;
+  const d = audio.duration, c = audio.currentTime || 0;
+  const v = d ? Math.round((c / d) * 1000) : 0;
+  const seek = $("#np-seek");
+  seek.value = v;
+  seek.style.setProperty("--pct", v / 10 + "%");
+  $("#np-cur").textContent = fmtTime(c);
+  $("#np-dur").textContent = fmtTime(d);
+}
+function renderQueue() {
+  const n = state.queue.length;
+  const upcoming = [];
+  for (let i = state.qIndex + 1; i < n && upcoming.length < 60; i++) upcoming.push(i);
+  $("#np-queue").innerHTML = upcoming.length
+    ? upcoming.map((i) => {
+        const q = state.queue[i];
+        return `<button class="q-item" data-q="${i}">
+          <div class="thumb" style="${phStyle(q.e.name, q.e.color)}">${initial(q.e.name)}${imgTag(coverList(q))}</div>
+          <div class="t"><b>${esc(trackTitle(q.t))}</b><span>${esc(q.artist)} · ${esc(q.e.name)}</span></div>
+        </button>`;
+      }).join("")
+    : `<div class="state" style="padding:22px">${esc(L("queueEnd"))}</div>`;
+}
+$("#np-queue").onclick = (e) => { const b = e.target.closest(".q-item"); if (b) goTo(+b.dataset.q); };
+$("#np-close").onclick = () => closeNowPlaying();
+$("#np-play").onclick = togglePlay;
+$("#np-next").onclick = () => nextTrack();
+$("#np-prev").onclick = prevTrack;
+$("#np-shuffle").onclick = () => {
+  settings.shuffle = !settings.shuffle; saveSettings();
+  $("#np-shuffle").classList.toggle("on", settings.shuffle);
+  toast(L(settings.shuffle ? "shuffleOn" : "shuffleOff"));
+};
+$("#np-repeat").onclick = () => {
+  settings.repeat = { off: "all", all: "one", one: "off" }[settings.repeat] || "off"; saveSettings();
+  $("#np-repeat").classList.toggle("on", settings.repeat !== "off");
+  $("#np-repeat .one").hidden = settings.repeat !== "one";
+  toast(L("repeat_" + settings.repeat));
+};
+$("#np-speed").onclick = () => {
+  settings.speed = SPEEDS[(SPEEDS.indexOf(settings.speed) + 1) % SPEEDS.length]; saveSettings();
+  audio.playbackRate = settings.speed;
+  $("#np-speed").textContent = settings.speed + "×";
+};
+$("#np-fav").onclick = () => {
+  const it = cur(); if (!it) return;
+  favs.has(it.artist) ? favs.delete(it.artist) : favs.add(it.artist);
+  saveFavs();
+  $("#np-fav").classList.toggle("on", favs.has(it.artist));
+  if (state.artistName === it.artist) $("#fav-toggle")?.classList.toggle("on", favs.has(it.artist));
+  toast(L(favs.has(it.artist) ? "favAdded" : "favRemoved"));
+};
+const goToArtist = () => {
+  const it = cur(); if (!it?.artist) return;
+  const target = "#/a/" + encodeURIComponent(it.artist);
+  closeNowPlaying().then(() => { if (!location.hash.startsWith(target)) location.hash = target; });
+};
+$("#np-artist").onclick = goToArtist;
+$("#np-go-artist").onclick = goToArtist;
+$("#np-eq").onclick = () => closeNowPlaying().then(() => { location.hash = "#/settings"; });
+const seekEl = $("#np-seek");
+seekEl.oninput = () => {
+  npSeeking = true;
+  seekEl.style.setProperty("--pct", seekEl.value / 10 + "%");
+  $("#np-cur").textContent = fmtTime((seekEl.value / 1000) * (audio.duration || 0));
+};
+seekEl.onchange = () => {
+  if (audio.duration) audio.currentTime = (seekEl.value / 1000) * audio.duration;
+  npSeeking = false;
+};
+
+// audio output
+const OUTPUT_ICONS = {
+  speaker: '<rect x="6" y="2" width="12" height="20" rx="3"/><circle cx="12" cy="15" r="3"/><path d="M12 6h.01"/>',
+  wired: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/>',
+  bluetooth: '<path d="M7 7l10 10-5 5V2l5 5L7 17"/>',
+};
+let lastOutput = { type: "speaker" };
+function showOutput(o) {
+  lastOutput = o;
+  const type = OUTPUT_ICONS[o.type] ? o.type : "speaker";
+  $("#np-output-icon").innerHTML = OUTPUT_ICONS[type];
+  $("#np-output").classList.toggle("bt", type === "bluetooth");
+  $("#np-output-name").textContent =
+    type === "bluetooth" ? o.name || L("outBluetooth") : type === "wired" ? o.name || L("outWired") : L("outPhone");
+}
+onNative("output", (o) => o && showOutput(o));
+$("#np-output").onclick = async () => {
+  if (!NATIVE_API) return toast(L("outputOnlyApp"));
+  const r = await native("showOutputSwitcher");
+  if (!r) toast(L("outputUnavailable"));
+};
+
+// swipe the player down to close it
+(() => {
+  let y0 = null, dy = 0;
+  const start = (e) => { y0 = e.clientY; dy = 0; np.classList.add("dragging"); };
+  const move = (e) => {
+    if (y0 === null) return;
+    dy = Math.max(0, e.clientY - y0);
+    np.style.transform = `translateY(${dy}px)`;
+  };
+  const end = () => {
+    if (y0 === null) return;
+    y0 = null;
+    np.classList.remove("dragging");
+    np.style.transform = "";
+    if (dy > 110) closeNowPlaying();
+  };
+  for (const el of [$("#np-grab"), $("#np-thumb")]) {
+    el.addEventListener("pointerdown", (e) => { if (!e.target.closest("button")) { el.setPointerCapture(e.pointerId); start(e); } });
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+  }
+})();
 
 // ---------- updates ----------
 const cmpVer = (a, b) => {
@@ -937,6 +1230,7 @@ async function renderSettings() {
       <h3>${esc(L("playback"))}</h3>
       <div class="rows">
         <label class="row"><span class="lbl">${esc(L("autoplay"))}</span>${sw("s-autoplay", settings.autoplay)}</label>
+        <label class="row"><span class="lbl">${esc(L("bgPlay"))}<small>${esc(L("bgPlayNote"))}</small></span>${sw("s-bgplay", settings.bgPlay, !NATIVE)}</label>
         <div class="row col"><span class="lbl">${esc(L("speed"))}</span>
           <div class="chips" id="s-speed" style="padding-bottom:0">
             ${SPEEDS.map((s) => `<button class="chip ${settings.speed === s ? "on" : ""}" data-s="${s}">${s}×</button>`).join("")}
@@ -948,6 +1242,11 @@ async function renderSettings() {
     <section class="group">
       <h3>${esc(L("appearance"))}</h3>
       <div class="rows">
+        <label class="row"><span class="lbl">${esc(L("theme"))}</span>
+          <span class="select-wrap"><select class="select" id="s-theme">
+            ${["system", "dark", "light"].map((k) => opt(k, L("theme_" + k), settings.theme === k)).join("")}
+          </select></span>
+        </label>
         <label class="row"><span class="lbl">${esc(L("compactGrid"))}</span>${sw("s-compact", settings.compact)}</label>
         <label class="row"><span class="lbl">${esc(L("reduceMotion"))}</span>${sw("s-motion", settings.reduceMotion)}</label>
       </div>
@@ -985,6 +1284,8 @@ async function renderSettings() {
   $("#s-lang").onchange = (e) => { settings.lang = e.target.value; saveSettings(); setLanguage(); renderSettings(); };
   bind("#s-eq", "eqOn", () => { $("#eq-rows").classList.toggle("eq-off", !settings.eqOn); applyEq(); });
   bind("#s-autoplay", "autoplay");
+  bind("#s-bgplay", "bgPlay", () => (settings.bgPlay ? syncNative() : native("stop")));
+  $("#s-theme").onchange = (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(true); };
   bind("#s-compact", "compact", applyLook);
   bind("#s-motion", "reduceMotion", applyLook);
   bind("#s-autoupd", "autoUpdate");
@@ -1058,6 +1359,7 @@ function route() {
 
 setLanguage();
 applyLook();
+applyTheme();
 window.addEventListener("hashchange", route);
 route();
 setTimeout(autoCheckUpdates, 1500);

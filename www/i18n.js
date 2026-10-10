@@ -4,6 +4,7 @@ const LANG_NAMES = { en: "English", it: "Italiano", es: "Español", fr: "França
 
 const I18N = {
   en: {
+    close: "Close", playingFrom: "Playing from", openArtist: "Open artist", seek: "Seek", shuffle: "Shuffle", repeat: "Repeat", upNext: "Up next", queueEnd: "Nothing else in the queue", shuffleOn: "Shuffle on", shuffleOff: "Shuffle off", repeat_off: "Repeat off", repeat_all: "Repeat all", repeat_one: "Repeat this track", outBluetooth: "Bluetooth", outWired: "Headphones", outPhone: "This phone", outputOnlyApp: "Choosing the audio output works in the Android app.", outputUnavailable: "Couldn't open the audio output picker", theme: "Theme", theme_system: "System", theme_dark: "Dark", theme_light: "Light", themeToggle: "Light or dark mode", bgPlay: "Background playback", bgPlayNote: "Keeps playing with the screen off, with controls in the notification and on the lock screen.",
     openSheet: "Open in Google Sheets",
     search: "Search…", filter: "Filter",
     back: "Back", prev: "Previous", next: "Next", playPause: "Play/Pause", favorite: "Favorite", play: "Play",
@@ -34,6 +35,7 @@ const I18N = {
     disclaimer: "Unofficial app, not affiliated with ArtistGrid. Trackers belong to their authors.",
   },
   it: {
+    close: "Chiudi", playingFrom: "In riproduzione da", openArtist: "Apri artista", seek: "Posizione", shuffle: "Casuale", repeat: "Ripeti", upNext: "Prossimi brani", queueEnd: "Nessun altro brano in coda", shuffleOn: "Riproduzione casuale attiva", shuffleOff: "Riproduzione casuale disattivata", repeat_off: "Ripetizione disattivata", repeat_all: "Ripeti tutto", repeat_one: "Ripeti questo brano", outBluetooth: "Bluetooth", outWired: "Cuffie", outPhone: "Questo telefono", outputOnlyApp: "La scelta dell'uscita audio funziona nell'app Android.", outputUnavailable: "Impossibile aprire la scelta dell'uscita audio", theme: "Tema", theme_system: "Sistema", theme_dark: "Scuro", theme_light: "Chiaro", themeToggle: "Modalità chiara o scura", bgPlay: "Riproduzione in background", bgPlayNote: "Continua a suonare a schermo spento, con i controlli nella notifica e sulla schermata di blocco.",
     openSheet: "Apri in Google Sheets",
     search: "Cerca…", filter: "Filtra",
     back: "Indietro", prev: "Precedente", next: "Successivo", playPause: "Play/Pausa", favorite: "Preferito", play: "Riproduci",
@@ -64,6 +66,7 @@ const I18N = {
     disclaimer: "App non ufficiale, non affiliata ad ArtistGrid. I tracker appartengono ai rispettivi autori.",
   },
   es: {
+    close: "Cerrar", playingFrom: "Reproduciendo desde", openArtist: "Abrir artista", seek: "Posición", shuffle: "Aleatorio", repeat: "Repetir", upNext: "A continuación", queueEnd: "No hay más canciones en la cola", shuffleOn: "Aleatorio activado", shuffleOff: "Aleatorio desactivado", repeat_off: "Repetición desactivada", repeat_all: "Repetir todo", repeat_one: "Repetir esta canción", outBluetooth: "Bluetooth", outWired: "Auriculares", outPhone: "Este teléfono", outputOnlyApp: "Elegir la salida de audio funciona en la app de Android.", outputUnavailable: "No se pudo abrir el selector de salida de audio", theme: "Tema", theme_system: "Sistema", theme_dark: "Oscuro", theme_light: "Claro", themeToggle: "Modo claro u oscuro", bgPlay: "Reproducción en segundo plano", bgPlayNote: "Sigue sonando con la pantalla apagada, con controles en la notificación y en la pantalla de bloqueo.",
     openSheet: "Abrir en Google Sheets",
     search: "Buscar…", filter: "Filtrar",
     back: "Atrás", prev: "Anterior", next: "Siguiente", playPause: "Reproducir/Pausa", favorite: "Favorito", play: "Reproducir",
@@ -94,6 +97,7 @@ const I18N = {
     disclaimer: "App no oficial, sin relación con ArtistGrid. Los trackers pertenecen a sus autores.",
   },
   fr: {
+    close: "Fermer", playingFrom: "Lecture depuis", openArtist: "Ouvrir l'artiste", seek: "Position", shuffle: "Aléatoire", repeat: "Répéter", upNext: "À suivre", queueEnd: "Plus rien dans la file d'attente", shuffleOn: "Lecture aléatoire activée", shuffleOff: "Lecture aléatoire désactivée", repeat_off: "Répétition désactivée", repeat_all: "Tout répéter", repeat_one: "Répéter ce titre", outBluetooth: "Bluetooth", outWired: "Casque", outPhone: "Ce téléphone", outputOnlyApp: "Le choix de la sortie audio fonctionne dans l'app Android.", outputUnavailable: "Impossible d'ouvrir le choix de la sortie audio", theme: "Thème", theme_system: "Système", theme_dark: "Sombre", theme_light: "Clair", themeToggle: "Mode clair ou sombre", bgPlay: "Lecture en arrière-plan", bgPlayNote: "Continue écran éteint, avec les commandes dans la notification et sur l'écran de verrouillage.",
     openSheet: "Ouvrir dans Google Sheets",
     search: "Rechercher…", filter: "Filtrer",
     back: "Retour", prev: "Précédent", next: "Suivant", playPause: "Lecture/Pause", favorite: "Favori", play: "Lire",
@@ -124,6 +128,7 @@ const I18N = {
     disclaimer: "App non officielle, non affiliée à ArtistGrid. Les trackers appartiennent à leurs auteurs.",
   },
   de: {
+    close: "Schließen", playingFrom: "Wiedergabe aus", openArtist: "Künstler öffnen", seek: "Position", shuffle: "Zufällig", repeat: "Wiederholen", upNext: "Als Nächstes", queueEnd: "Nichts mehr in der Warteschlange", shuffleOn: "Zufallswiedergabe an", shuffleOff: "Zufallswiedergabe aus", repeat_off: "Wiederholen aus", repeat_all: "Alle wiederholen", repeat_one: "Diesen Titel wiederholen", outBluetooth: "Bluetooth", outWired: "Kopfhörer", outPhone: "Dieses Telefon", outputOnlyApp: "Die Wahl der Audioausgabe funktioniert in der Android-App.", outputUnavailable: "Audioausgabe-Auswahl konnte nicht geöffnet werden", theme: "Design", theme_system: "System", theme_dark: "Dunkel", theme_light: "Hell", themeToggle: "Heller oder dunkler Modus", bgPlay: "Hintergrundwiedergabe", bgPlayNote: "Spielt bei ausgeschaltetem Bildschirm weiter, mit Steuerung in der Benachrichtigung und auf dem Sperrbildschirm.",
     openSheet: "In Google Sheets öffnen",
     search: "Suchen…", filter: "Filtern",
     back: "Zurück", prev: "Zurück", next: "Weiter", playPause: "Wiedergabe/Pause", favorite: "Favorit", play: "Abspielen",
@@ -154,6 +159,7 @@ const I18N = {
     disclaimer: "Inoffizielle App, nicht mit ArtistGrid verbunden. Die Tracker gehören ihren Autoren.",
   },
   pt: {
+    close: "Fechar", playingFrom: "Tocando de", openArtist: "Abrir artista", seek: "Posição", shuffle: "Aleatório", repeat: "Repetir", upNext: "A seguir", queueEnd: "Nada mais na fila", shuffleOn: "Aleatório ativado", shuffleOff: "Aleatório desativado", repeat_off: "Repetição desativada", repeat_all: "Repetir tudo", repeat_one: "Repetir esta faixa", outBluetooth: "Bluetooth", outWired: "Fones de ouvido", outPhone: "Este telefone", outputOnlyApp: "A escolha da saída de áudio funciona no app Android.", outputUnavailable: "Não foi possível abrir a escolha da saída de áudio", theme: "Tema", theme_system: "Sistema", theme_dark: "Escuro", theme_light: "Claro", themeToggle: "Modo claro ou escuro", bgPlay: "Reprodução em segundo plano", bgPlayNote: "Continua tocando com a tela desligada, com controles na notificação e na tela de bloqueio.",
     openSheet: "Abrir no Google Sheets",
     search: "Buscar…", filter: "Filtrar",
     back: "Voltar", prev: "Anterior", next: "Próxima", playPause: "Reproduzir/Pausar", favorite: "Favorito", play: "Reproduzir",
