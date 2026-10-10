@@ -54,7 +54,7 @@ const EQ_PRESETS = {
 const SPEEDS = [0.75, 1, 1.25, 1.5];
 const DEFAULTS = {
   lang: "auto", eqOn: false, eqPreset: "flat", eqGains: [0, 0, 0, 0, 0],
-  autoplay: true, speed: 1, compact: false, reduceMotion: false, autoUpdate: true,
+  autoplay: true, translate: true, speed: 1, compact: false, reduceMotion: false, autoUpdate: true,
   theme: "dark", uiStyle: "glass", accent: "mono", bgPlay: true, shuffle: false, repeat: "off", haptics: true,
 };
 const settings = { ...DEFAULTS, ...(store("settings") || {}) };
@@ -125,7 +125,8 @@ const idb = (() => {
   return {
     get: (k) => tx("readonly", (s) => s.get(k)).catch(() => null),
     set: (k, v) => tx("readwrite", (s) => s.put(v, k)).catch(() => {}),
-    count: () => tx("readonly", (s) => s.count()).catch(() => 0),
+    // trackers only ("t:…" keys), not cached translations
+    count: () => tx("readonly", (s) => s.getAllKeys()).then((k) => (k || []).filter((x) => String(x).startsWith("t:")).length).catch(() => 0),
     clear: () => tx("readwrite", (s) => s.clear()).catch(() => {}),
   };
 })();
@@ -365,6 +366,7 @@ const ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   filter: '<svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
   check: '<svg viewBox="0 0 24 24" class="check"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  translate: '<svg viewBox="0 0 24 24" class="fill"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>',
 };
 const searchBox = (id, placeholder, value = "") =>
   `<div class="search-wrap">${ICONS.search}<input class="search" id="${id}" type="search" placeholder="${esc(placeholder)}" value="${esc(value)}" autocomplete="off" /></div>`;
@@ -727,6 +729,7 @@ async function loadSection(a, ui) {
         eb.dataset.ready = "1";
         eb.innerHTML = (e.description ? `<div class="era-desc">${esc(e.description)}</div>` : "") +
           (e.tracks.length ? "" : `<div class="state">${esc(L("noTracks"))}</div>`);
+        if (e.description) autoTranslate(eb.querySelector(".era-desc"), e.description);
         appendTracks(eb, e.tracks.map((t) => ({ t, e })), false);
       }
       // bring the opened era up under the header
@@ -743,7 +746,11 @@ async function loadSection(a, ui) {
     const tr = ev.target.closest(".track");
     if (!tr) return;
     // the info button (or a row that can't play) opens the details; anywhere else plays the track
-    if (ev.target.closest(".info") || !playableUrl(tr._item.t)) { tr.classList.toggle("expanded"); return; }
+    if (ev.target.closest(".info") || !playableUrl(tr._item.t)) {
+      tr.classList.toggle("expanded");
+      if (tr.classList.contains("expanded") && tr._item.t.notes) autoTranslate(tr.querySelector(".notes"), tr._item.t.notes);
+      return;
+    }
     haptic();
     if (cur()?.t === tr._item.t) togglePlay();
     else playItem(tr._item, tr.closest(".era-body, #list"));
@@ -829,6 +836,83 @@ function trackEl(item, showEra) {
     </div>
     ${t.notes || links || credits.length > 60 ? `<button class="info icon-btn" aria-label="${esc(L("details"))}"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>` : ""}`;
   return el;
+}
+
+// ---------- automatic translation of tracker texts ----------
+// Era descriptions and track notes are written in English. When the app is in another language
+// they are translated as they appear: on the device with ML Kit in the app (offline after a
+// one-time model download), otherwise with Google Translate online. Results are cached, and a
+// small button at the end of the text switches between the translation and the original.
+const trPending = new Map();
+let nativeTrBroken = false;
+const hashStr = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + "." + s.length; };
+async function translateOnline(text) {
+  // a few lines per request, so the URL stays short
+  const chunks = [];
+  for (const line of text.split("\n")) {
+    if (chunks.length && (chunks[chunks.length - 1] + "\n" + line).length < 1500) chunks[chunks.length - 1] += "\n" + line;
+    else chunks.push(line);
+  }
+  const out = [];
+  for (const c of chunks) {
+    if (!/[a-z]/i.test(c)) { out.push(c); continue; }
+    const d = await getJson(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${LANG}&dt=t&q=${encodeURIComponent(c)}`);
+    out.push((d?.[0] || []).map((x) => x?.[0] || "").join(""));
+  }
+  return out.join("\n");
+}
+async function translateOnDevice(text) {
+  // line by line, so paragraphs and lists keep their shape
+  const lines = await Promise.all(text.split("\n").map(async (l) => {
+    if (!/[a-z]/i.test(l)) return l;
+    const r = await window.Capacitor.nativePromise("ArtistGridNative", "translate", { text: l, to: LANG });
+    if (typeof r?.text !== "string") throw new Error("no text");
+    return r.text;
+  }));
+  return lines.join("\n");
+}
+function translateText(text) {
+  const key = `tr:${LANG}:${hashStr(text)}`;
+  if (trPending.has(key)) return trPending.get(key);
+  const p = (async () => {
+    const saved = await idb.get(key);
+    if (typeof saved === "string") return saved;
+    let res;
+    if (NATIVE_API && !nativeTrBroken) {
+      try { res = await translateOnDevice(text); }
+      catch { nativeTrBroken = true; } // e.g. no Google Play services: use the online service
+    }
+    if (res === undefined) res = await translateOnline(text);
+    idb.set(key, res);
+    return res;
+  })();
+  trPending.set(key, p);
+  p.catch(() => trPending.delete(key));
+  return p;
+}
+function autoTranslate(el, text) {
+  text = String(text ?? "");
+  if (!el || el.dataset.tr || !settings.translate || LANG === "en" || !/[a-z]{3}/i.test(text)) return;
+  el.dataset.tr = "1";
+  el.innerHTML = `<span class="tr-text">${esc(text)}</span> <button class="tr-btn loading" aria-label="${esc(L("showOriginal"))}">${ICONS.translate}</button>`;
+  const span = el.firstElementChild, btn = el.lastElementChild;
+  let translated = null, showingOriginal = true;
+  btn.onclick = (ev) => {
+    ev.stopPropagation(); // not a tap on the track (which would play it)
+    if (translated === null) return;
+    showingOriginal = !showingOriginal;
+    span.textContent = showingOriginal ? text : translated;
+    btn.classList.toggle("orig", showingOriginal);
+    btn.setAttribute("aria-label", L(showingOriginal ? "showTranslation" : "showOriginal"));
+    haptic();
+  };
+  translateText(text).then((res) => {
+    if (!res.trim() || res.trim() === text.trim()) return btn.remove();
+    translated = res;
+    showingOriginal = false;
+    span.textContent = res;
+    btn.classList.remove("loading");
+  }).catch(() => btn.remove());
 }
 
 // ---------- native bridge (Android only) ----------
@@ -1416,6 +1500,7 @@ async function renderSettings() {
             ${Object.entries(LANG_NAMES).map(([k, n]) => opt(k, n, settings.lang === k)).join("")}
           </select></span>
         </label>
+        <label class="row"><span class="lbl">${esc(L("translateAuto"))}<small>${esc(L("translateNote"))}</small></span>${sw("s-translate", settings.translate)}</label>
       </div>
     </section>
 
@@ -1513,6 +1598,7 @@ async function renderSettings() {
   $("#s-lang").onchange = (e) => { settings.lang = e.target.value; saveSettings(); setLanguage(); renderSettings(); };
   bind("#s-eq", "eqOn", () => { $("#eq-rows").classList.toggle("eq-off", !settings.eqOn); applyEq(); });
   bind("#s-autoplay", "autoplay");
+  bind("#s-translate", "translate");
   bind("#s-haptics", "haptics", () => haptic(15));
   bind("#s-bgplay", "bgPlay", () => (settings.bgPlay ? syncNative() : native("stop")));
   $("#s-theme").onchange = (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(true); };

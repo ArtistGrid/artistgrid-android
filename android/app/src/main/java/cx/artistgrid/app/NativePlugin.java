@@ -31,6 +31,13 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.google.mlkit.common.model.DownloadConditions;
+import com.google.mlkit.nl.translate.TranslateLanguage;
+import com.google.mlkit.nl.translate.Translation;
+import com.google.mlkit.nl.translate.Translator;
+import com.google.mlkit.nl.translate.TranslatorOptions;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Bridge between the web player and Android: keeps playback alive in the background through
@@ -45,6 +52,7 @@ public class NativePlugin extends Plugin {
     private static NativePlugin instance;
     private boolean askedNotifications = false;
     private AudioDeviceCallback deviceCallback;
+    private final Map<String, Translator> translators = new HashMap<>();
 
     @Override
     public void load() {
@@ -66,6 +74,10 @@ public class NativePlugin extends Plugin {
         if (deviceCallback != null) am.unregisterAudioDeviceCallback(deviceCallback);
         getContext().stopService(new Intent(getContext(), PlaybackService.class));
         if (instance == this) instance = null;
+        synchronized (translators) {
+            for (Translator t : translators.values()) t.close();
+            translators.clear();
+        }
     }
 
     /** Forwards a control pressed in the notification / lock screen / headset to the web player. */
@@ -282,6 +294,40 @@ public class NativePlugin extends Plugin {
         JSArray out = new JSArray();
         for (int id : ids) out.put(String.format("#%06x", ContextCompat.getColor(ctx, id) & 0xffffff));
         return out;
+    }
+
+    /**
+     * Translates English text on the device with ML Kit. The language model (~30 MB) downloads
+     * on first use; afterwards translation works offline. Resolves { text }.
+     */
+    @PluginMethod
+    public void translate(PluginCall call) {
+        String text = call.getString("text");
+        String target = TranslateLanguage.fromLanguageTag(call.getString("to", ""));
+        if (text == null || target == null || target.equals(TranslateLanguage.ENGLISH)) {
+            call.reject("Unsupported language");
+            return;
+        }
+        Translator translator;
+        synchronized (translators) {
+            translator = translators.get(target);
+            if (translator == null) {
+                translator = Translation.getClient(new TranslatorOptions.Builder()
+                        .setSourceLanguage(TranslateLanguage.ENGLISH)
+                        .setTargetLanguage(target)
+                        .build());
+                translators.put(target, translator);
+            }
+        }
+        final Translator t = translator;
+        t.downloadModelIfNeeded(new DownloadConditions.Builder().build())
+                .onSuccessTask(v -> t.translate(text))
+                .addOnSuccessListener(result -> {
+                    JSObject ret = new JSObject();
+                    ret.put("text", result);
+                    call.resolve(ret);
+                })
+                .addOnFailureListener(e -> call.reject(String.valueOf(e.getMessage())));
     }
 
     /** Light or dark system bar icons (and bar colour on Android versions that still colour them). */

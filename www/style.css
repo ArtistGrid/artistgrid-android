@@ -341,6 +341,16 @@ body.is-playing .track .play.on .bars i { animation: bar 1s ease-in-out infinite
 .track .lnk { display: none; margin-top: 7px; gap: 6px; flex-wrap: wrap; }
 .track.expanded .lnk { display: flex; }
 .track .lnk a { font-size: 12px; color: var(--link); word-break: break-all; }
+/* translated tracker text: the icon at the end switches to the original and back */
+.tr-btn {
+  display: inline-grid; place-items: center; width: 24px; height: 22px; margin: -2px 0 -4px 2px; vertical-align: baseline;
+  border-radius: 7px; color: var(--accent); transition: color .2s, opacity .2s;
+}
+.tr-btn svg { width: 15px; height: 15px; }
+.tr-btn.orig { color: var(--muted); }
+.tr-btn.loading { color: var(--muted); animation: tr-pulse 1s ease-in-out infinite; }
+@keyframes tr-pulse { 50% { opacity: .3; } }
+svg.fill { fill: currentColor; stroke: none; }
 .era-tag { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 
 .state { text-align: center; color: var(--muted); padding: 50px 20px; }
