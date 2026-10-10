@@ -1092,6 +1092,30 @@ const fmtTime = (s) => {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
 
+// Titles that don't fit scroll like on Spotify: the text waits, slides until its end is visible,
+// waits again and starts over. Short titles stay still; with "Reduce animations" they end in "…".
+function setMarquee(el, text) {
+  el.textContent = "";
+  const span = document.createElement("span");
+  span.className = "mq";
+  span.textContent = text;
+  el.appendChild(span);
+  fitMarquee(el);
+}
+function fitMarquee(el) {
+  const span = el.firstElementChild;
+  if (!span) return;
+  el.classList.remove("scrolling");
+  const over = span.scrollWidth - el.clientWidth;
+  if (over <= 2 || settings.reduceMotion || !el.clientWidth) return;
+  const x = over + 18; // past the fade at the right edge
+  el.style.setProperty("--mq-x", -x + "px");
+  el.style.setProperty("--mq-dur", (x / 28 / 0.6).toFixed(1) + "s"); // ~28 px/s while moving, 40% of the time paused
+  void el.offsetWidth; // restart the animation from the beginning
+  el.classList.add("scrolling");
+}
+const marqueeRO = new ResizeObserver((entries) => entries.forEach((e) => fitMarquee(e.target)));
+
 function playItem(item, container) {
   const items = (container?._items || [item]).filter((x) => playableUrl(x.t)).map((x) => ({ ...x, artist: state.artistName }));
   state.queue = items;
@@ -1118,7 +1142,7 @@ function startCurrent(direct = false, autoplay = true, seek = 0) {
   if (autoplay) audio.play().catch(() => {});
   $("#player").hidden = false;
   document.body.classList.add("has-player");
-  $("#p-title").textContent = title;
+  setMarquee($("#p-title"), title);
   $("#p-sub").textContent = `${it.artist} · ${e.name}`;
   $("#p-thumb").setAttribute("style", phStyle(e.name, e.color));
   $("#p-thumb").dataset.initial = (String(e.name).trim()[0] || "♪").toUpperCase();
@@ -1210,6 +1234,8 @@ const togglePlay = () => {
   audio.paused ? audio.play().catch(() => {}) : audio.pause();
 };
 $("#p-play").onclick = togglePlay;
+marqueeRO.observe($("#p-title"));
+marqueeRO.observe($("#np-title"));
 $("#p-next").onclick = () => nextTrack();
 $("#p-prev").onclick = prevTrack;
 $("#p-open").onclick = () => { if (!miniSwiped) openNowPlaying(); };
@@ -1353,7 +1379,7 @@ window.addEventListener("popstate", () => { if (npIsOpen() && !history.state?.np
 
 function renderNowPlaying() {
   const it = cur(); if (!it) return;
-  $("#np-title").textContent = trackTitle(it.t);
+  setMarquee($("#np-title"), trackTitle(it.t));
   $("#np-artist").textContent = it.artist;
   $("#np-era").textContent = it.e.name;
   $("#np-thumb").setAttribute("style", phStyle(it.e.name, it.e.color));
