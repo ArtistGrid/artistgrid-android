@@ -1,18 +1,15 @@
-Settings, an equalizer, update checks and a smoother interface.
+A redesigned artist page, smarter covers and a working Back gesture.
 
 ### What's new
-- **Settings** (gear button next to the title): language, equalizer, playback, appearance, offline storage and updates, all in one place.
-- **Equalizer**: 5 bands (60 Hz – 14 kHz) with presets (Flat, Bass boost, Vocals, Treble, Loudness) or your own curve.
-- **Choose the language**: follow the device language or pick English, Italiano, Español, Français, Deutsch or Português.
-- **Playback options**: autoplay the next track on/off and playback speed (0.75× – 1.5×).
-- **Update checks**: Settings shows when a new version is out and downloads it in one tap; the app can also check at startup.
-- **Title and search stay visible** while you scroll, in the artist grid and in an artist's tracks (with the track filters). Searching hides the artist info so results start right away.
-- **More covers load**: if an artist photo or an era cover fails, the app retries it through the app itself (no referrer) and tries alternative names. Covers that really don't exist show a colored placeholder instead of an empty box.
-- **Smoother animations**: heavy blur is now used only on the floating bars, off-screen artists and tracks are skipped while scrolling, covers fade in, and pages slide in gently. A "Reduce animations" switch is in Settings.
-- **Appearance**: optional compact artist grid.
-- Offline cache can be cleared from Settings.
+- **Artist header that stays with you**: the artist's photo, name, track count and ♥ stay pinned at the top while you scroll the tracks, together with the search bar and the tracker sections (Unreleased, Released, Stems, Recent…). Switching section no longer reloads the whole page.
+- **Filter menu**: the track filters (All, Playable, Full, Snippet) moved into a glass menu next to the search bar; the button lights up when a filter is active.
+- **Blurred artist backdrop** behind the top of the artist page.
+- **Covers from Apple Music and Deezer**: when a tracker cover or an artist photo is missing or broken, the app looks it up online and only accepts results whose artist name matches, so you don't get someone else's cover. Results are cached on the phone.
+- **Now playing**: animated bars mark the track that is playing, and tapping the song in the mini-player opens its artist.
+- **Android Back gesture** now goes back through the app's pages instead of closing the app.
+- Fixed a layout glitch that could shift the bottom bar sideways on the artist page.
 
 ### Installation
-Download **ArtistGrid.apk** below, open it on your phone and allow installation from unknown sources. Requires Android 6.0+.
+Download **ArtistGrid.apk** below and open it on your phone. If you installed v1.2.0, this version installs over it and keeps your favorites. Older versions (1.0.0, 1.1.0) were signed differently: uninstall them first. Requires Android 6.0+.
 
-> Debug build, not signed for the Play Store. If Android refuses to install it over the version you have, uninstall the old one first (your saved favorites will be reset). Playback may stop when the screen is off.
+> Debug build, not signed for the Play Store. Playback may stop when the screen is off.

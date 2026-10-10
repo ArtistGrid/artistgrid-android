@@ -4,6 +4,7 @@ const LANG_NAMES = { en: "English", it: "Italiano", es: "Español", fr: "França
 
 const I18N = {
   en: {
+    search: "Search…", filter: "Filter",
     back: "Back", prev: "Previous", next: "Next", playPause: "Play/Pause", favorite: "Favorite", play: "Play",
     tabAll: "Artists", tabBest: "Top", tabUpdated: "Updated", tabFav: "Favorites",
     titleBest: "Recommended", titleUpdated: "Recently updated",
@@ -32,6 +33,7 @@ const I18N = {
     disclaimer: "Unofficial app, not affiliated with ArtistGrid. Trackers belong to their authors.",
   },
   it: {
+    search: "Cerca…", filter: "Filtra",
     back: "Indietro", prev: "Precedente", next: "Successivo", playPause: "Play/Pausa", favorite: "Preferito", play: "Riproduci",
     tabAll: "Artisti", tabBest: "Top", tabUpdated: "Recenti", tabFav: "Preferiti",
     titleBest: "Consigliati", titleUpdated: "Aggiornati di recente",
@@ -60,6 +62,7 @@ const I18N = {
     disclaimer: "App non ufficiale, non affiliata ad ArtistGrid. I tracker appartengono ai rispettivi autori.",
   },
   es: {
+    search: "Buscar…", filter: "Filtrar",
     back: "Atrás", prev: "Anterior", next: "Siguiente", playPause: "Reproducir/Pausa", favorite: "Favorito", play: "Reproducir",
     tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recientes", tabFav: "Favoritos",
     titleBest: "Recomendados", titleUpdated: "Actualizados",
@@ -88,6 +91,7 @@ const I18N = {
     disclaimer: "App no oficial, sin relación con ArtistGrid. Los trackers pertenecen a sus autores.",
   },
   fr: {
+    search: "Rechercher…", filter: "Filtrer",
     back: "Retour", prev: "Précédent", next: "Suivant", playPause: "Lecture/Pause", favorite: "Favori", play: "Lire",
     tabAll: "Artistes", tabBest: "Top", tabUpdated: "Récents", tabFav: "Favoris",
     titleBest: "Recommandés", titleUpdated: "Mis à jour",
@@ -116,6 +120,7 @@ const I18N = {
     disclaimer: "App non officielle, non affiliée à ArtistGrid. Les trackers appartiennent à leurs auteurs.",
   },
   de: {
+    search: "Suchen…", filter: "Filtern",
     back: "Zurück", prev: "Zurück", next: "Weiter", playPause: "Wiedergabe/Pause", favorite: "Favorit", play: "Abspielen",
     tabAll: "Künstler", tabBest: "Top", tabUpdated: "Neu", tabFav: "Favoriten",
     titleBest: "Empfohlen", titleUpdated: "Kürzlich aktualisiert",
@@ -144,6 +149,7 @@ const I18N = {
     disclaimer: "Inoffizielle App, nicht mit ArtistGrid verbunden. Die Tracker gehören ihren Autoren.",
   },
   pt: {
+    search: "Buscar…", filter: "Filtrar",
     back: "Voltar", prev: "Anterior", next: "Próxima", playPause: "Reproduzir/Pausar", favorite: "Favorito", play: "Reproduzir",
     tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recentes", tabFav: "Favoritos",
     titleBest: "Recomendados", titleUpdated: "Atualizados",

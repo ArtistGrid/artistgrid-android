@@ -11,7 +11,8 @@ Browse artists, explore trackers era by era and listen to tracks right from your
 - **Bottom navigation**: a floating "liquid glass" tab bar (Artists, Top, Updated, Favorites) within thumb reach, with a glass mini-player above it.
 - **Language**: the interface follows the phone's language (English, Italiano, Español, Français, Deutsch, Português; English is the fallback), or can be picked in Settings.
 - **Settings**: 5-band equalizer with presets, autoplay and playback speed, compact grid, reduced animations, offline cache and update checks.
-- **Sticky header**: the title and search stay visible while scrolling artists and tracks.
+- **Sticky header**: the title and search stay visible while scrolling artists; on an artist page the photo, name, search, filter menu and tracker sections stay pinned too.
+- **Cover lookup**: missing or broken covers and artist photos are looked up on Apple Music (iTunes Search API) and Deezer, accepting only results whose artist name matches.
 - **Full trackers**: every tab (Unreleased, Released, Recent, Best Of, Stems…), with eras, cover art, descriptions and stats.
 - **Track details**: quality, available length, leak date, credits, notes and links.
 - **Track search**: search the whole tracker by title, notes or era, with *Playable*, *Full* and *Snippet* filters.
@@ -37,6 +38,7 @@ It is a [Capacitor](https://capacitorjs.com) app: the interface is plain HTML/CS
 | Trackers | `https://trackerapi.artistgrid.cx/sh/<id>/` · `/sh/<id>/tab/<tab>` |
 | Artist photos | `https://assets.artistgrid.cx/webp/<name>.webp` |
 | Audio | pillows.su, pixeldrain and Google Drive links, resolved the same way as on the site |
+| Fallback covers | `https://itunes.apple.com/search` · `https://api.deezer.com/search/{artist,album}` |
 
 Requests go through Capacitor's native HTTP client (`CapacitorHttp`), so the app does not depend on CORS rules. Downloaded trackers are stored in IndexedDB for offline use.
 

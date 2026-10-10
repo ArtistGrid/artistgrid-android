@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -144,42 +144,130 @@ function parseCsv(text) {
 }
 
 // ---------- images: fallback chain + placeholders ----------
-// Each <img> carries the URLs still to try in data-next. A failed load moves to the next one
-// (the same URL through the native proxy, then alternative names); when none is left the
-// image is hidden and the gradient placeholder underneath shows.
+// Each <img> carries the sources still to try in data-next. A failed load moves to the next one:
+// the same URL through the native proxy, alternative file names, then an online lookup
+// ("lookup:<kind>:<artist>:<title>" tokens). When nothing is left the image hides and the
+// gradient placeholder underneath shows.
+const lookupToken = (kind, artist, title = "") => `lookup:${kind}:${encodeURIComponent(artist)}:${encodeURIComponent(title)}`;
 function candidates(urls) {
   const out = [];
-  for (const u of urls.filter(Boolean)) { out.push(u); if (NATIVE && /^https?:/.test(u)) out.push(proxied(u)); }
+  for (const u of urls.filter(Boolean)) {
+    out.push(u);
+    if (NATIVE && /^https?:/.test(u)) out.push(proxied(u));
+  }
   return [...new Set(out)];
 }
+// "data:," fails at once, so an image whose only source is a lookup starts the chain lazily.
+const EMPTY_SRC = "data:,";
 function imgTag(urls, lazy = true) {
-  const [first, ...rest] = candidates(urls);
-  if (!first) return "";
-  return `<img ${lazy ? 'loading="lazy"' : ""} decoding="async" referrerpolicy="no-referrer" alt="" src="${esc(first)}" data-next="${esc(rest.map(encodeURIComponent).join(" "))}" />`;
+  const list = candidates(urls);
+  if (!list.length) return "";
+  const first = list[0].startsWith("lookup:") ? EMPTY_SRC : list.shift();
+  return `<img ${lazy ? 'loading="lazy"' : ""} decoding="async" referrerpolicy="no-referrer" alt="" src="${esc(first)}" data-next="${esc(list.map(encodeURIComponent).join(" "))}" />`;
 }
 function setImg(img, urls) {
-  const [first, ...rest] = candidates(urls);
+  const list = candidates(urls);
   img.classList.remove("loaded", "failed");
-  img.dataset.next = rest.map(encodeURIComponent).join(" ");
-  if (first) img.src = first; else { img.removeAttribute("src"); img.classList.add("failed"); }
+  img.dataset.next = list.slice(1).map(encodeURIComponent).join(" ");
+  if (!list.length) { img.removeAttribute("src"); img.classList.add("failed"); }
+  else if (list[0].startsWith("lookup:")) { img.dataset.next = list.map(encodeURIComponent).join(" "); img.src = EMPTY_SRC; }
+  else img.src = list[0];
+}
+function advanceImg(img) {
+  const [next, ...rest] = (img.dataset.next || "").split(" ").filter(Boolean);
+  if (!next) { img.classList.add("failed"); return; }
+  img.dataset.next = rest.join(" ");
+  const src = decodeURIComponent(next);
+  if (!src.startsWith("lookup:")) { img.src = src; return; }
+  const [, kind, artist, title] = src.split(":");
+  lookupCover(kind, decodeURIComponent(artist), decodeURIComponent(title)).then((url) => {
+    if (!url) return advanceImg(img);
+    img.dataset.next = [...(NATIVE ? [proxied(url)] : []).map(encodeURIComponent), ...rest].join(" ");
+    img.src = url;
+  });
 }
 document.addEventListener("error", (e) => {
   const img = e.target;
-  if (img.tagName !== "IMG" || !("next" in img.dataset)) return;
-  const [next, ...rest] = img.dataset.next.split(" ").filter(Boolean);
-  if (next) { img.dataset.next = rest.join(" "); img.src = decodeURIComponent(next); }
-  else img.classList.add("failed");
+  if (img.tagName === "IMG" && "next" in img.dataset) advanceImg(img);
 }, true);
 document.addEventListener("load", (e) => { if (e.target.tagName === "IMG") e.target.classList.add("loaded"); }, true);
 
 function artistImgs(name) {
   const base = name.toLowerCase();
   return [
-    base.replace(/[^a-z0-9]/g, ""),
-    base.replace(/\$/g, "s").replace(/&/g, "and").replace(/[^a-z0-9]/g, ""),
-    norm(base).replace(/[^a-z0-9]/g, ""),
-  ].filter((s, i, a) => s && a.indexOf(s) === i).map((s) => ASSETS + s + ".webp");
+    ...[
+      base.replace(/[^a-z0-9]/g, ""),
+      base.replace(/\$/g, "s").replace(/&/g, "and").replace(/[^a-z0-9]/g, ""),
+      norm(base).replace(/[^a-z0-9]/g, ""),
+    ].filter((s, i, a) => s && a.indexOf(s) === i).map((s) => ASSETS + s + ".webp"),
+    lookupToken("artist", name),
+  ];
 }
+const eraImgs = (era, artist) => [era.cover_art, lookupToken("album", artist, era.name)];
+
+// ---------- cover lookup (Apple Music / Deezer) ----------
+// Only results whose artist name matches are accepted, so a missing cover never turns into a
+// wrong one. Answers (including "not found") are cached; network errors are not.
+const lookupCache = store("cover_cache") || {};
+let lookupSaveT;
+const saveLookup = () => { clearTimeout(lookupSaveT); lookupSaveT = setTimeout(() => store("cover_cache", lookupCache), 800); };
+const nameKey = (s) => norm(s).replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]/g, "");
+const sameArtist = (found, wanted) => !!nameKey(wanted) && nameKey(found).includes(nameKey(wanted));
+function sameTitle(found, wanted) {
+  const f = nameKey(found), w = nameKey(wanted);
+  if (!f || !w) return false;
+  if (f === w) return true;
+  const [short, long] = f.length < w.length ? [f, w] : [w, f];
+  return short.length >= 4 && long.startsWith(short);
+}
+async function getJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function findArtistPicture(artist) {
+  const d = await getJson(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artist)}&limit=5`);
+  const hit = (d.data || []).find((x) => nameKey(x.name) === nameKey(artist));
+  // Deezer's placeholder for artists without a photo has an empty id in the path
+  return hit?.picture_xl && !/\/artist\/\/\d/.test(hit.picture_xl) ? hit.picture_xl : "";
+}
+async function findAlbumCover(artist, title) {
+  const clean = title.replace(/\(.*?\)|\[.*?\]/g, "").trim();
+  if (!nameKey(clean)) return "";
+  try {
+    const d = await getJson(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + " " + clean)}&entity=album&limit=20`);
+    const hit = (d.results || []).find((x) => sameArtist(x.artistName, artist) && sameTitle(x.collectionName, clean));
+    if (hit?.artworkUrl100) return hit.artworkUrl100.replace(/\/\d+x\d+bb\./, "/600x600bb.");
+  } catch {}
+  const d = await getJson(`https://api.deezer.com/search/album?q=${encodeURIComponent(`artist:"${artist}" album:"${clean}"`)}&limit=10`);
+  const hit = (d.data || []).find((x) => sameArtist(x.artist?.name, artist) && sameTitle(x.title, clean));
+  return hit?.cover_xl || "";
+}
+const lookupPending = new Map();
+const lookupQueue = [];
+let lookupActive = 0;
+function pumpLookups() {
+  while (lookupActive < 3 && lookupQueue.length) {
+    const job = lookupQueue.shift();
+    lookupActive++;
+    job().finally(() => { lookupActive--; pumpLookups(); });
+  }
+}
+function lookupCover(kind, artist, title) {
+  const k = `${kind}:${nameKey(artist)}:${nameKey(title)}`;
+  if (k in lookupCache) return Promise.resolve(lookupCache[k]);
+  if (lookupPending.has(k)) return lookupPending.get(k);
+  const p = new Promise((resolve) => {
+    lookupQueue.push(() => (kind === "artist" ? findArtistPicture(artist) : findAlbumCover(artist, title))
+      .then((url) => { lookupCache[k] = url; saveLookup(); resolve(url); })
+      .catch(() => resolve(""))
+      .finally(() => lookupPending.delete(k)));
+    pumpLookups();
+  });
+  lookupPending.set(k, p);
+  return p;
+}
+
 // Stable gradient per name, so missing covers still look intentional.
 function phStyle(seed, color) {
   if (color && /^#[0-9a-f]{3,8}$/i.test(color)) return `--ph:linear-gradient(135deg, ${color}, #111)`;
@@ -250,6 +338,8 @@ const ICONS = {
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  filter: '<svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
+  check: '<svg viewBox="0 0 24 24" class="check"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
 };
 const searchBox = (id, placeholder, value = "") =>
   `<div class="search-wrap">${ICONS.search}<input class="search" id="${id}" type="search" placeholder="${esc(placeholder)}" value="${esc(value)}" autocomplete="off" /></div>`;
@@ -336,62 +426,43 @@ function drawGrid() {
 }
 
 // ---------- artist / tracker ----------
+const TRACK_FILTERS = ["all", "play", "full", "snippet"];
+const FILTER_LABELS = { all: "fAll", play: "fPlay", full: "fFull", snippet: "fSnippet" };
+
+// The artist page keeps one sticky header (photo, name, favorite, search, filter, sections);
+// switching section only reloads what is below it.
 async function renderArtist(name, tabSlug) {
   setChrome({ sub: true });
   try { await loadArtists(); } catch {}
   const a = state.artists.find((x) => x.name === name);
-  const headHtml = (n, extra = "") => `
-    <div class="head"><div class="head-row"><h1>${esc(n)}</h1>${extra}</div></div>`;
-  if (!a) return errorView(L("artistNotFound"), () => route(), headHtml(name));
+  if (!a) {
+    return errorView(L("artistNotFound"), () => route(), `<div class="head"><div class="head-row"><h1>${esc(name)}</h1></div></div>`);
+  }
   state.artistName = a.name;
-  view.innerHTML = headHtml(a.name) + `<div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div>`;
-
-  const path = tabSlug ? `/sh/${a.url}/tab/${encodeURIComponent(tabSlug)}` : `/sh/${a.url}/`;
-  let res;
-  try { res = await cachedJson(TRACKER_API + path, "t:" + a.url + ":" + (tabSlug || "")); }
-  catch { return errorView(L("trackerError"), () => renderArtist(name, tabSlug), headHtml(a.name)); }
-  if (res.offline) toast(L("trackerOffline"));
-  if (state.artistName !== a.name) return; // navigated away while loading
-
-  const d = res.data;
-  state.tracker = d;
-  const eras = (d.eras || []).map((e, i) => ({ ...e, i, tracks: e.tracks || [] }));
-  const all = [];
-  for (const e of eras) for (const t of e.tracks) all.push({ t, e });
-  const curTab = d.tab?.slug || tabSlug || "main";
-  const updated = d.last_updated ? new Date(d.last_updated * 1000).toLocaleDateString(LOCALE) : "";
-  const credits = Array.isArray(d.credits) ? d.credits.join(", ") : (d.credits || a.credit);
+  const pic = artistImgs(a.name);
+  const ui = { q: "", f: "all", tab: tabSlug || "" };
 
   view.innerHTML = `
-    <div class="head">
+    <div class="backdrop" aria-hidden="true">${imgTag(pic, false)}</div>
+    <div class="head artist-head">
       <div class="head-row">
-        <h1>${esc(a.name)}</h1>
+        <div class="thumb avatar" style="${phStyle(a.name)}">${initial(a.name)}${imgTag(pic, false)}</div>
+        <div class="titles">
+          <h1>${esc(a.name)}</h1>
+          <div class="sub" id="a-sub">${esc(L("loadingTracker"))}</div>
+        </div>
         <button id="fav-toggle" class="icon-btn round ${favs.has(a.name) ? "on" : ""}" aria-label="${esc(L("favorite"))}">${ICONS.heart}</button>
       </div>
-      ${searchBox("tq", L("searchTracks", { n: all.length }))}
-      <div class="chips" id="tf">
-        ${[["all", L("fAll")], ["play", L("fPlay")], ["full", L("fFull")], ["snippet", L("fSnippet")]]
-          .map(([k, l], i) => `<button class="chip ${i ? "" : "on"}" data-f="${k}">${esc(l)}</button>`).join("")}
-      </div>
-    </div>
-    <div class="hero-block">
-      <div class="hero">
-        <div class="thumb" style="${phStyle(a.name)}">${initial(a.name)}${imgTag(artistImgs(a.name), false)}</div>
-        <div class="info">
-          <p>${L("nTracks", { n: all.length })} · ${L("nEras", { n: eras.length })}${updated ? " · " + esc(L("updatedOn", { d: updated })) : ""}</p>
-          ${credits ? `<p>${esc(L("trackerBy", { c: credits }))}</p>` : ""}
-          <div class="links-row">
-            <a class="pill-link" href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit" target="_blank" rel="noopener">Google Sheet ↗</a>
-            ${(d.discord || []).slice(0, 1).map((u) => `<a class="pill-link" href="${esc(u)}" target="_blank" rel="noopener">Discord ↗</a>`).join("")}
-          </div>
+      <div class="search-row">
+        ${searchBox("tq", L("search"))}
+        <button id="filter-btn" class="icon-btn round" aria-label="${esc(L("filter"))}" aria-haspopup="true">${ICONS.filter}</button>
+        <div class="menu glass" id="filter-menu" role="menu" hidden>
+          ${TRACK_FILTERS.map((k) => `<button class="menu-item ${k === "all" ? "on" : ""}" role="menuitemradio" data-f="${k}">${esc(L(FILTER_LABELS[k]))}${ICONS.check}</button>`).join("")}
         </div>
       </div>
-      <div class="chips" id="tabs">
-        ${(d.tabs || []).filter((t, i, arr) => arr.findIndex((x) => x.slug === t.slug) === i && !["key", "template"].includes(t.slug))
-          .map((t) => `<button class="chip ${t.slug === curTab ? "on" : ""}" data-s="${esc(t.slug)}">${esc(t.name)}</button>`).join("")}
-      </div>
+      <div class="chips sections" id="tabs"></div>
     </div>
-    <div id="list"></div>`;
+    <div id="a-body"><div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div></div>`;
 
   const fav = $("#fav-toggle");
   fav.onclick = () => {
@@ -402,40 +473,104 @@ async function renderArtist(name, tabSlug) {
     toast(L(favs.has(a.name) ? "favAdded" : "favRemoved"));
   };
 
-  // keep the selected tab visible
-  const onTab = $("#tabs .chip.on");
-  if (onTab) $("#tabs").scrollLeft = onTab.offsetLeft - ($("#tabs").clientWidth - onTab.offsetWidth) / 2;
+  // filter menu
+  const menu = $("#filter-menu"), fbtn = $("#filter-btn");
+  const closeMenu = () => { menu.hidden = true; fbtn.classList.remove("open"); };
+  fbtn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; fbtn.classList.toggle("open", !menu.hidden); };
+  menu.onclick = (e) => {
+    const b = e.target.closest(".menu-item"); if (!b) return;
+    ui.f = b.dataset.f;
+    menu.querySelectorAll(".menu-item").forEach((x) => x.classList.toggle("on", x === b));
+    fbtn.classList.toggle("on", ui.f !== "all");
+    closeMenu();
+    ui.draw?.();
+  };
+  document.addEventListener("click", function off(e) {
+    if (!document.body.contains(menu)) return document.removeEventListener("click", off);
+    if (!menu.hidden && !e.target.closest("#filter-menu")) closeMenu();
+  });
+
+  $("#tq").oninput = (ev) => { ui.q = norm(ev.target.value.trim()); ui.draw?.(); };
+
   $("#tabs").onclick = (e) => {
     const b = e.target.closest(".chip"); if (!b || b.classList.contains("on")) return;
-    location.replace(`#/a/${encodeURIComponent(a.name)}/${encodeURIComponent(b.dataset.s)}`);
+    $("#tabs").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c === b));
+    // update the URL without a hashchange, so the header (and its scroll) stays put
+    history.replaceState(null, "", `#/a/${encodeURIComponent(a.name)}/${encodeURIComponent(b.dataset.s)}`);
+    ui.tab = b.dataset.s;
+    window.scrollTo(0, 0);
+    loadSection(a, ui);
   };
 
-  let tq = "", tf = "all";
+  await loadSection(a, ui);
+}
+
+async function loadSection(a, ui) {
+  const body = $("#a-body");
+  const token = (ui.token = {});
+  body.innerHTML = `<div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div>`;
+  const path = ui.tab ? `/sh/${a.url}/tab/${encodeURIComponent(ui.tab)}` : `/sh/${a.url}/`;
+  let res;
+  try { res = await cachedJson(TRACKER_API + path, "t:" + a.url + ":" + ui.tab); }
+  catch {
+    if (ui.token !== token || state.artistName !== a.name) return;
+    $("#a-sub").textContent = "";
+    body.innerHTML = `<div class="state">${esc(L("trackerError"))}<br><button class="btn" id="retry">${esc(L("retry"))}</button></div>`;
+    $("#retry").onclick = () => loadSection(a, ui);
+    return;
+  }
+  if (ui.token !== token || state.artistName !== a.name) return; // navigated away while loading
+  if (res.offline) toast(L("trackerOffline"));
+
+  const d = res.data;
+  state.tracker = d;
+  const eras = (d.eras || []).map((e, i) => ({ ...e, i, tracks: e.tracks || [] }));
+  const all = [];
+  for (const e of eras) for (const t of e.tracks) all.push({ t, e });
+  const curTab = d.tab?.slug || ui.tab || "";
+  const updated = d.last_updated ? new Date(d.last_updated * 1000).toLocaleDateString(LOCALE) : "";
+  const credits = Array.isArray(d.credits) ? d.credits.join(", ") : (d.credits || a.credit);
+
+  $("#a-sub").textContent = [L("nTracks", { n: all.length }), L("nEras", { n: eras.length }), updated && L("updatedOn", { d: updated })].filter(Boolean).join(" · ");
+  $("#tq").placeholder = L("searchTracks", { n: all.length });
+
+  const tabs = (d.tabs || []).filter((t, i, arr) => arr.findIndex((x) => x.slug === t.slug) === i && !["key", "template"].includes(t.slug));
+  const tabsEl = $("#tabs");
+  if (!tabsEl.children.length) {
+    tabsEl.innerHTML = tabs.map((t, i) => `<button class="chip ${t.slug === curTab || (!curTab && !i) ? "on" : ""}" data-s="${esc(t.slug)}">${esc(t.name)}</button>`).join("");
+    tabsEl.hidden = tabs.length < 2;
+    const on = tabsEl.querySelector(".chip.on");
+    if (on) tabsEl.scrollLeft = on.offsetLeft - (tabsEl.clientWidth - on.offsetWidth) / 2;
+  }
+
+  body.innerHTML = `
+    <div class="info-block">
+      ${credits ? `<p>${esc(L("trackerBy", { c: credits }))}</p>` : ""}
+      <div class="links-row">
+        <a class="pill-link" href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit" target="_blank" rel="noopener">Google Sheet ↗</a>
+        ${(d.discord || []).slice(0, 1).map((u) => `<a class="pill-link" href="${esc(u)}" target="_blank" rel="noopener">Discord ↗</a>`).join("")}
+      </div>
+    </div>
+    <div id="list"></div>`;
+
   const matches = ({ t, e }) => {
     const al = norm(t.available_length);
-    if (tf === "play" && !playableUrl(t)) return false;
-    if (tf === "full" && !/full|og file/.test(al)) return false;
-    if (tf === "snippet" && !/snippet|partial/.test(al)) return false;
-    if (!tq) return true;
-    return norm(t.name?.raw ?? t.name).includes(tq) || norm(t.notes).includes(tq) || norm(e.name).includes(tq);
+    if (ui.f === "play" && !playableUrl(t)) return false;
+    if (ui.f === "full" && !/full|og file/.test(al)) return false;
+    if (ui.f === "snippet" && !/snippet|partial/.test(al)) return false;
+    if (!ui.q) return true;
+    return norm(t.name?.raw ?? t.name).includes(ui.q) || norm(t.notes).includes(ui.q) || norm(e.name).includes(ui.q);
   };
 
   const list = $("#list");
-  const draw = () => {
-    // while searching/filtering, hide the artist info so results start right under the header
-    view.classList.toggle("searching", !!(tq || tf !== "all"));
-    if (!tq && tf === "all") {
+  ui.draw = () => {
+    // while searching/filtering, hide the tracker info so results start right under the header
+    view.classList.toggle("searching", !!(ui.q || ui.f !== "all"));
+    if (!ui.q && ui.f === "all") {
       list.innerHTML = eras.map((e) => eraHtml(e, a.name)).join("") || `<div class="state">${esc(L("emptyTab"))}</div>`;
       return;
     }
     renderFlat(list, all.filter(matches));
-  };
-  $("#tq").oninput = (ev) => { tq = norm(ev.target.value.trim()); draw(); };
-  $("#tf").onclick = (e) => {
-    const b = e.target.closest(".chip"); if (!b) return;
-    tf = b.dataset.f;
-    $("#tf").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c === b));
-    draw();
   };
 
   list.onclick = (ev) => {
@@ -443,12 +578,13 @@ async function renderArtist(name, tabSlug) {
     if (head) {
       const el = head.parentElement, e = eras[el.dataset.e];
       el.classList.toggle("open");
-      const body = el.querySelector(".era-body");
-      if (el.classList.contains("open") && !body.dataset.ready) {
-        body.dataset.ready = "1";
-        body.innerHTML = (e.description ? `<div class="era-desc">${esc(e.description)}</div>` : "") +
+      head.setAttribute("aria-expanded", el.classList.contains("open"));
+      const eb = el.querySelector(".era-body");
+      if (el.classList.contains("open") && !eb.dataset.ready) {
+        eb.dataset.ready = "1";
+        eb.innerHTML = (e.description ? `<div class="era-desc">${esc(e.description)}</div>` : "") +
           (e.tracks.length ? "" : `<div class="state">${esc(L("noTracks"))}</div>`);
-        appendTracks(body, e.tracks.map((t) => ({ t, e })), false);
+        appendTracks(eb, e.tracks.map((t) => ({ t, e })), false);
       }
       return;
     }
@@ -461,9 +597,8 @@ async function renderArtist(name, tabSlug) {
     if (tr) tr.classList.toggle("expanded");
   };
 
-  draw();
-  enter($(".hero-block"));
-  enter(list);
+  ui.draw();
+  enter(body);
 }
 
 function eraHtml(e, artist) {
@@ -471,8 +606,8 @@ function eraHtml(e, artist) {
   const sum = s ? [s.og_file && `${s.og_file} OG`, s.full && `${s.full} full`, s.snippet && `${s.snippet} snippet`].filter(Boolean).join(" · ") : "";
   return `
     <div class="era" data-e="${e.i}">
-      <button class="era-head">
-        <div class="thumb" style="${phStyle(e.name, e.color)}">${initial(e.name)}${imgTag([e.cover_art, ...(e.cover_art ? [] : artistImgs(artist))])}</div>
+      <button class="era-head" aria-expanded="false">
+        <div class="thumb" style="${phStyle(e.name, e.color)}">${initial(e.name)}${imgTag(eraImgs(e, artist))}</div>
         <div class="t"><b>${esc(e.name)}</b><span>${L("nTracks", { n: e.tracks.length })}${sum ? " · " + sum : ""}</span></div>
         <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>
@@ -529,6 +664,7 @@ function trackEl(item, showEra) {
   el.innerHTML = `
     <button class="play ${on ? "on" : ""}" ${playable ? "" : "disabled"} aria-label="${esc(L("play"))}">
       <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>
+      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
     <div class="body">
       ${showEra ? `<div class="era-tag">${esc(e.name)}</div>` : ""}
@@ -601,7 +737,7 @@ function startCurrent(direct = false) {
   $("#p-sub").textContent = `${it.artist} · ${e.name}`;
   const thumb = $("#p-thumb");
   thumb.setAttribute("style", phStyle(e.name, e.color));
-  setImg($("#p-cover"), [e.cover_art, ...artistImgs(it.artist)]);
+  setImg($("#p-cover"), [...eraImgs(e, it.artist), ...artistImgs(it.artist)]);
   document.querySelectorAll(".track").forEach((el) => {
     const on = el._item?.t === t;
     el.classList.toggle("playing", on);
@@ -624,6 +760,12 @@ const togglePlay = () => {
   audio.paused ? audio.play().catch(() => {}) : audio.pause();
 };
 $("#p-play").onclick = togglePlay;
+// tapping the song in the mini-player opens its artist
+$("#p-open").onclick = () => {
+  const it = cur(); if (!it?.artist) return;
+  const target = "#/a/" + encodeURIComponent(it.artist);
+  if (!location.hash.startsWith(target)) location.hash = target;
+};
 $("#p-next").onclick = () => step(1);
 $("#p-prev").onclick = () => (audio.currentTime > 3 ? (audio.currentTime = 0) : step(-1));
 $("#p-progress").onclick = (e) => {
@@ -633,8 +775,8 @@ $("#p-progress").onclick = (e) => {
 const playIcon = $("#p-play-icon"), bar = $("#p-bar");
 for (const el of [audioFx, audioRaw]) {
   el.ontimeupdate = () => { if (el === audio) bar.style.transform = `scaleX(${el.duration ? el.currentTime / el.duration : 0})`; };
-  el.onplay = () => { if (el === audio) playIcon.setAttribute("d", "M7 4h3v16H7zM14 4h3v16h-3z"); };
-  el.onpause = () => { if (el === audio) playIcon.setAttribute("d", "M7 4l13 8-13 8z"); };
+  el.onplay = () => { if (el === audio) { playIcon.setAttribute("d", "M7 4h3v16H7zM14 4h3v16h-3z"); document.body.classList.add("is-playing"); } };
+  el.onpause = () => { if (el === audio) { playIcon.setAttribute("d", "M7 4l13 8-13 8z"); document.body.classList.remove("is-playing"); } };
   el.onended = () => { if (el === audio && settings.autoplay) step(1); };
   el.onerror = () => {
     if (el !== audio || !el.getAttribute("src")) return;
