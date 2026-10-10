@@ -4,6 +4,7 @@ const LANG_NAMES = { en: "English", it: "Italiano", es: "Español", fr: "França
 
 const I18N = {
   en: {
+    openSheet: "Open in Google Sheets",
     search: "Search…", filter: "Filter",
     back: "Back", prev: "Previous", next: "Next", playPause: "Play/Pause", favorite: "Favorite", play: "Play",
     tabAll: "Artists", tabBest: "Top", tabUpdated: "Updated", tabFav: "Favorites",
@@ -33,6 +34,7 @@ const I18N = {
     disclaimer: "Unofficial app, not affiliated with ArtistGrid. Trackers belong to their authors.",
   },
   it: {
+    openSheet: "Apri in Google Sheets",
     search: "Cerca…", filter: "Filtra",
     back: "Indietro", prev: "Precedente", next: "Successivo", playPause: "Play/Pausa", favorite: "Preferito", play: "Riproduci",
     tabAll: "Artisti", tabBest: "Top", tabUpdated: "Recenti", tabFav: "Preferiti",
@@ -62,6 +64,7 @@ const I18N = {
     disclaimer: "App non ufficiale, non affiliata ad ArtistGrid. I tracker appartengono ai rispettivi autori.",
   },
   es: {
+    openSheet: "Abrir en Google Sheets",
     search: "Buscar…", filter: "Filtrar",
     back: "Atrás", prev: "Anterior", next: "Siguiente", playPause: "Reproducir/Pausa", favorite: "Favorito", play: "Reproducir",
     tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recientes", tabFav: "Favoritos",
@@ -91,6 +94,7 @@ const I18N = {
     disclaimer: "App no oficial, sin relación con ArtistGrid. Los trackers pertenecen a sus autores.",
   },
   fr: {
+    openSheet: "Ouvrir dans Google Sheets",
     search: "Rechercher…", filter: "Filtrer",
     back: "Retour", prev: "Précédent", next: "Suivant", playPause: "Lecture/Pause", favorite: "Favori", play: "Lire",
     tabAll: "Artistes", tabBest: "Top", tabUpdated: "Récents", tabFav: "Favoris",
@@ -120,6 +124,7 @@ const I18N = {
     disclaimer: "App non officielle, non affiliée à ArtistGrid. Les trackers appartiennent à leurs auteurs.",
   },
   de: {
+    openSheet: "In Google Sheets öffnen",
     search: "Suchen…", filter: "Filtern",
     back: "Zurück", prev: "Zurück", next: "Weiter", playPause: "Wiedergabe/Pause", favorite: "Favorit", play: "Abspielen",
     tabAll: "Künstler", tabBest: "Top", tabUpdated: "Neu", tabFav: "Favoriten",
@@ -149,6 +154,7 @@ const I18N = {
     disclaimer: "Inoffizielle App, nicht mit ArtistGrid verbunden. Die Tracker gehören ihren Autoren.",
   },
   pt: {
+    openSheet: "Abrir no Google Sheets",
     search: "Buscar…", filter: "Filtrar",
     back: "Voltar", prev: "Anterior", next: "Próxima", playPause: "Reproduzir/Pausar", favorite: "Favorito", play: "Reproduzir",
     tabAll: "Artistas", tabBest: "Top", tabUpdated: "Recentes", tabFav: "Favoritos",

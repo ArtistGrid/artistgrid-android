@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -426,6 +426,75 @@ function drawGrid() {
 }
 
 // ---------- artist / tracker ----------
+// ---------- tracker data normalisation ----------
+// Tabs don't all share one shape: most return eras with tracks, but some (e.g. "Recent")
+// return a flat list of tracks, or use other key names. Everything is turned into
+// [{ name, cover_art, …, tracks: [track] }] with tracks in the usual track shape.
+const TRACK_KEYS = ["links", "link", "url", "urls", "available_length", "quality", "notes", "track_length", "length", "leak_date", "release_date", "type", "file_date"];
+const LIST_KEYS = ["tracks", "songs", "rows", "items", "data", "entries", "records"];
+const GROUP_KEYS = ["eras", "sections", "groups", "categories", "albums"];
+const isObj = (o) => o && typeof o === "object" && !Array.isArray(o);
+const looksLikeTrack = (o) => isObj(o) && ("name" in o || "title" in o || "song" in o) && TRACK_KEYS.some((k) => k in o);
+const trackList = (a) => Array.isArray(a) && a.length > 0 && a.filter(looksLikeTrack).length * 2 >= a.length ? a.filter(looksLikeTrack) : null;
+
+function normTrack(t) {
+  let name = t.name ?? t.title ?? t.song ?? "";
+  if (typeof name !== "object" || name === null) name = { title: String(name), raw: String(name) };
+  else name = { ...name, title: name.title ?? name.raw ?? "", raw: name.raw ?? name.title ?? "" };
+  let links = t.links ?? t.urls ?? t.link ?? t.url ?? [];
+  if (!Array.isArray(links)) links = [links];
+  links = links.flatMap((l) => {
+    if (!l) return [];
+    if (typeof l === "string") return l.split(/\s+/).filter((u) => /^https?:\/\//.test(u)).map((url) => ({ url }));
+    return l.url ? [{ ...l, url: String(l.url) }] : [];
+  });
+  const notes = Array.isArray(t.notes) ? t.notes.join("\n") : t.notes;
+  return { ...t, name, links, notes };
+}
+
+function normalizeEras(d, fallbackName = "") {
+  const list = (o) => { for (const k of LIST_KEYS) { const l = trackList(o?.[k]); if (l) return l; } return null; };
+  const eraName = (e) => String(e.name ?? e.title ?? e.era ?? "");
+  let groups = null;
+  for (const k of GROUP_KEYS) {
+    if (Array.isArray(d[k]) && d[k].some(isObj)) {
+      groups = d[k].filter(isObj).map((e) => ({ ...e, name: eraName(e), tracks: list(e) || [] }));
+      break;
+    }
+  }
+  // flat list of tracks at the top level (or the response itself is the list)
+  const flat = trackList(d) || list(d);
+  if (flat && !(groups && groups.some((g) => g.tracks.length))) {
+    // keep the tracker's own grouping when each track says which era it belongs to
+    const byEra = new Map();
+    for (const t of flat) {
+      const key = String(t.era?.name ?? t.era ?? t.section ?? t.album ?? "").trim() || fallbackName;
+      if (!byEra.has(key)) byEra.set(key, { name: key, tracks: [] });
+      byEra.get(key).tracks.push(t);
+    }
+    // carry over era details (cover, colour, description) when the response also lists them
+    const known = new Map((groups || []).map((g) => [nameKey(g.name), g]));
+    groups = [...byEra.values()].map((g) => ({ ...(known.get(nameKey(g.name)) || {}), ...g }));
+  }
+  if (!groups || !groups.some((g) => g.tracks.length)) {
+    // last resort: any list of tracks anywhere in the response, grouped by its parent
+    const found = [];
+    const walk = (node, parent, depth) => {
+      if (depth > 5 || !node || typeof node !== "object") return;
+      const l = trackList(node);
+      if (l) {
+        const era = isObj(parent) && parent !== d ? parent : {};
+        found.push({ ...era, name: eraName(era) || fallbackName, tracks: l });
+        return;
+      }
+      for (const v of Array.isArray(node) ? node : Object.values(node)) walk(v, Array.isArray(node) ? parent : node, depth + 1);
+    };
+    walk(d, null, 0);
+    if (found.length) groups = found;
+  }
+  return (groups || []).map((g, i) => ({ ...g, i, tracks: (g.tracks || []).map(normTrack) }));
+}
+
 const TRACK_FILTERS = ["all", "play", "full", "snippet"];
 const FILTER_LABELS = { all: "fAll", play: "fPlay", full: "fFull", snippet: "fSnippet" };
 
@@ -524,7 +593,8 @@ async function loadSection(a, ui) {
 
   const d = res.data;
   state.tracker = d;
-  const eras = (d.eras || []).map((e, i) => ({ ...e, i, tracks: e.tracks || [] }));
+  const tabName = (d.tabs || []).find((t) => t.slug === (d.tab?.slug || ui.tab))?.name || d.tab?.name || "";
+  const eras = normalizeEras(d, tabName);
   const all = [];
   for (const e of eras) for (const t of e.tracks) all.push({ t, e });
   const curTab = d.tab?.slug || ui.tab || "";
@@ -553,6 +623,12 @@ async function loadSection(a, ui) {
     </div>
     <div id="list"></div>`;
 
+  // nothing readable in this tab: offer the same tab in the Google Sheet
+  const gid = (d.tabs || []).find((t) => t.slug === curTab)?.gid ?? d.tab?.gid;
+  const emptyTabHtml = () => `<div class="state">${esc(L("emptyTab"))}<br>
+    <a class="btn ghost" style="display:inline-block;margin-top:14px;text-decoration:none" target="_blank" rel="noopener"
+      href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit${gid != null ? "#gid=" + esc(gid) : ""}">${esc(L("openSheet"))} ↗</a></div>`;
+
   const matches = ({ t, e }) => {
     const al = norm(t.available_length);
     if (ui.f === "play" && !playableUrl(t)) return false;
@@ -567,7 +643,7 @@ async function loadSection(a, ui) {
     // while searching/filtering, hide the tracker info so results start right under the header
     view.classList.toggle("searching", !!(ui.q || ui.f !== "all"));
     if (!ui.q && ui.f === "all") {
-      list.innerHTML = eras.map((e) => eraHtml(e, a.name)).join("") || `<div class="state">${esc(L("emptyTab"))}</div>`;
+      list.innerHTML = eras.map((e) => eraHtml(e, a.name)).join("") || emptyTabHtml();
       return;
     }
     renderFlat(list, all.filter(matches));
