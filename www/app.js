@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.5.2"; // web fallback; inside the app the APK's own version is used
+const APP_VERSION = "1.5.4"; // web fallback; inside the app the APK's own version is used
 const REPO = "ArtistGrid/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -795,6 +795,23 @@ function appendTracks(container, items, showEra, from = 0) {
   }
 }
 
+// Track credits look like "(with X) (feat. Y & Z) (prod. W)". Featured artists ("feat.", "ft.",
+// "with") are shown with the title everywhere (list, player, notification); the rest (producers…)
+// stays on the line under the title.
+const FEAT_RE = /^\(\s*(feat\.?|ft\.?|featuring|with)\s/i;
+function splitCredits(t) {
+  const raw = Array.isArray(t.name?.credits) ? t.name.credits.join(" ") : String(t.name?.credits ?? "");
+  const groups = raw.match(/\([^()]*\)/g) || [];
+  const feats = groups.filter((g) => FEAT_RE.test(g));
+  const rest = feats.reduce((s, g) => s.replace(g, ""), raw).replace(/\s+/g, " ").trim();
+  return { feats, rest };
+}
+function trackTitle(t) {
+  const base = String(t.name?.title || t.name?.raw || (typeof t.name === "string" ? t.name : "")).trim();
+  const feats = splitCredits(t).feats.filter((g) => !base.includes(g));
+  return [base, ...feats].join(" ");
+}
+
 function qualityClass(q) {
   const n = norm(q);
   if (/high|cd|lossless|og/.test(n)) return "q-ok";
@@ -807,8 +824,8 @@ function trackEl(item, showEra) {
   const el = document.createElement("div");
   el.className = "track";
   el._item = item;
-  const title = t.name?.title ?? t.name?.raw ?? t.name ?? "";
-  const credits = (t.name?.credits || []).join(" ");
+  const title = trackTitle(t);
+  const credits = splitCredits(t).rest;
   const playable = !!playableUrl(t);
   const on = cur() && cur().t === t;
   if (on) el.classList.add("playing");
@@ -1026,16 +1043,21 @@ function toggleTheme() {
 const audioFx = $("#audio-fx"), audioRaw = $("#audio-raw");
 let audio = NATIVE ? audioFx : audioRaw;
 const cur = () => state.queue[state.qIndex];
-const eq = { ctx: null, filters: [] };
+const eq = { ctx: null, src: null, pre: null, filters: [], active: null };
 state.history = []; // indexes played before the current one (for Previous and shuffle)
 
+// Sound quality: the context uses the "playback" latency (bigger buffers, no crackles with the
+// screen off), boosts are balanced by a pre-gain so loud tracks don't clip and distort, and when
+// the equalizer is off or flat the audio skips the filters entirely (bit-identical to the source).
 function ensureEq() {
-  if (eq.ctx || !NATIVE || !settings.eqOn) return;
+  if (eq.ctx || eq.failed || !NATIVE || !settings.eqOn) return;
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
   try {
-    eq.ctx = new Ctx();
-    let node = eq.ctx.createMediaElementSource(audioFx);
+    try { eq.ctx = new Ctx({ latencyHint: "playback" }); } catch { eq.ctx = new Ctx(); }
+    eq.src = eq.ctx.createMediaElementSource(audioFx);
+    eq.pre = eq.ctx.createGain();
+    let node = eq.pre;
     eq.filters = EQ_FREQS.map((f, i) => {
       const b = eq.ctx.createBiquadFilter();
       b.type = i === 0 ? "lowshelf" : i === EQ_FREQS.length - 1 ? "highshelf" : "peaking";
@@ -1044,16 +1066,27 @@ function ensureEq() {
       return b;
     });
     node.connect(eq.ctx.destination);
-  } catch { eq.ctx = null; eq.filters = []; }
+    eq.active = null;
+  } catch { eq.ctx = null; eq.src = null; eq.filters = []; eq.failed = true; return; } // no retry loop
   applyEq();
 }
 function applyEq() {
   ensureEq();
-  eq.filters.forEach((b, i) => b.gain.setTargetAtTime(settings.eqOn ? settings.eqGains[i] : 0, eq.ctx.currentTime, 0.05));
-  if (eq.ctx?.state === "suspended") eq.ctx.resume();
+  if (!eq.ctx) return;
+  const t = eq.ctx.currentTime;
+  eq.filters.forEach((b, i) => b.gain.setTargetAtTime(settings.eqOn ? settings.eqGains[i] : 0, t, 0.05));
+  // take the biggest boost off beforehand: peaks then stay under 0 dBFS instead of clipping
+  const boost = settings.eqOn ? Math.max(0, ...settings.eqGains) : 0;
+  eq.pre.gain.setTargetAtTime(Math.pow(10, -boost / 20), t, 0.05);
+  const active = settings.eqOn && settings.eqGains.some((g) => g !== 0);
+  if (eq.active !== active) {
+    eq.src.disconnect();
+    eq.src.connect(active ? eq.pre : eq.ctx.destination);
+    eq.active = active;
+  }
+  if (eq.ctx.state === "suspended") eq.ctx.resume();
 }
 
-const trackTitle = (t) => t.name?.title || t.name?.raw || "";
 // the album (era) cover only: when none exists the placeholder shows the era name, never the artist photo
 const coverList = (it) => eraImgs(it.e, it.artist);
 const fmtTime = (s) => {

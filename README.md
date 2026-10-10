@@ -1,14 +1,16 @@
 # ArtistGrid for Android
 
-An **unofficial** Android app for [ArtistGrid](https://artistgrid.cx), the collection of unreleased music trackers.
+The **official** Android app for [ArtistGrid](https://artistgrid.cx), the collection of unreleased music trackers.
 Browse artists, explore trackers era by era and listen to tracks right from your phone, with an interface built for mobile.
 
-> This project is not affiliated with ArtistGrid. All data comes from the site's public APIs, and the trackers belong to their respective authors, who are credited in the app.
+> Data comes from ArtistGrid's APIs. The trackers belong to their respective authors, who are credited in the app.
 
 ## Features
 
 - **Artist grid**: 580+ artists with photos and instant search.
-- **Bottom navigation**: a floating "liquid glass" tab bar (Artists, Top, Updated, Favorites) within thumb reach, with a glass mini-player above it.
+- **Bottom navigation**: a floating tab bar (Artists, Top, Updated, Favorites) within thumb reach, with a mini-player above it.
+- **Two styles**: the **Liquid Glass** look or **Material You** (flat tinted surfaces, Android-style controls), with hand-picked accent gradients or your wallpaper colors on Android 12+.
+- **Translated descriptions**: era descriptions and track notes are translated into the app language on the device; one tap shows the original.
 - **Language**: the interface follows the phone's language (English, Italiano, Español, Français, Deutsch, Português; English is the fallback), or can be picked in Settings.
 - **Settings**: 5-band equalizer with presets, autoplay and playback speed, compact grid, reduced animations, offline cache and update checks.
 - **Sticky header**: the title and search stay visible while scrolling artists; on an artist page the photo, name, search, filter menu and tracker sections stay pinned too.
@@ -17,7 +19,7 @@ Browse artists, explore trackers era by era and listen to tracks right from your
 - **Track details**: quality, available length, leak date, credits, notes and links.
 - **Track search**: search the whole tracker by title, notes or era, with *Playable*, *Full* and *Snippet* filters.
 - **Built-in player**: a mini-player above the tab bar that opens a full-screen player with cover, seek bar, shuffle, repeat, playback speed, queue and audio output picker (Bluetooth, headphones, speaker).
-- **Background playback**: music keeps playing with the screen off, with controls in the notification, on the lock screen and on headsets.
+- **Background playback**: music keeps playing with the screen off, with the album cover and controls in the notification, on the lock screen and on headsets.
 - **Light and dark theme**: switch with the button next to the title, or follow the system in Settings.
 - **Favorites**: save the artists you follow.
 - **Offline use**: trackers you have already opened stay available without a connection, and a copy of the artist list ships with the app.

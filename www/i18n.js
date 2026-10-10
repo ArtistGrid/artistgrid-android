@@ -37,7 +37,7 @@ const I18N = {
     upToDate: "You're on the latest version", updateAvailable: "Version {v} is available", download: "Download",
     updateError: "Couldn't check for updates", autoUpdates: "Check at startup", newVersion: "Version {v} is available: open Settings to download it",
     about: "About", sourceCode: "Source code on GitHub", website: "ArtistGrid website",
-    disclaimer: "Unofficial app, not affiliated with ArtistGrid. Trackers belong to their authors.",
+    disclaimer: "The official ArtistGrid app for Android. Trackers belong to their authors.",
   },
   it: {
     eggCountdown: "Ancora {n}…", eggCorner: "Angolo! ×{n} 🎉",
@@ -73,7 +73,7 @@ const I18N = {
     upToDate: "Hai già l'ultima versione", updateAvailable: "È disponibile la versione {v}", download: "Scarica",
     updateError: "Impossibile controllare gli aggiornamenti", autoUpdates: "Controlla all'avvio", newVersion: "È disponibile la versione {v}: aprila dalle Impostazioni",
     about: "Informazioni", sourceCode: "Codice sorgente su GitHub", website: "Sito di ArtistGrid",
-    disclaimer: "App non ufficiale, non affiliata ad ArtistGrid. I tracker appartengono ai rispettivi autori.",
+    disclaimer: "L'app ufficiale di ArtistGrid per Android. I tracker appartengono ai rispettivi autori.",
   },
   es: {
     eggCountdown: "{n} más…", eggCorner: "¡Esquina! ×{n} 🎉",
@@ -109,7 +109,7 @@ const I18N = {
     upToDate: "Tienes la última versión", updateAvailable: "La versión {v} está disponible", download: "Descargar",
     updateError: "No se pudieron buscar actualizaciones", autoUpdates: "Comprobar al iniciar", newVersion: "La versión {v} está disponible: ábrela en Ajustes",
     about: "Información", sourceCode: "Código fuente en GitHub", website: "Sitio web de ArtistGrid",
-    disclaimer: "App no oficial, sin relación con ArtistGrid. Los trackers pertenecen a sus autores.",
+    disclaimer: "La app oficial de ArtistGrid para Android. Los trackers pertenecen a sus autores.",
   },
   fr: {
     eggCountdown: "Encore {n}…", eggCorner: "Coin ! ×{n} 🎉",
@@ -145,7 +145,7 @@ const I18N = {
     upToDate: "Vous avez la dernière version", updateAvailable: "La version {v} est disponible", download: "Télécharger",
     updateError: "Impossible de vérifier les mises à jour", autoUpdates: "Vérifier au démarrage", newVersion: "La version {v} est disponible : ouvrez les Réglages",
     about: "À propos", sourceCode: "Code source sur GitHub", website: "Site d'ArtistGrid",
-    disclaimer: "App non officielle, non affiliée à ArtistGrid. Les trackers appartiennent à leurs auteurs.",
+    disclaimer: "L'app officielle d'ArtistGrid pour Android. Les trackers appartiennent à leurs auteurs.",
   },
   de: {
     eggCountdown: "Noch {n}…", eggCorner: "Ecke! ×{n} 🎉",
@@ -181,7 +181,7 @@ const I18N = {
     upToDate: "Du hast die neueste Version", updateAvailable: "Version {v} ist verfügbar", download: "Herunterladen",
     updateError: "Updates konnten nicht geprüft werden", autoUpdates: "Beim Start prüfen", newVersion: "Version {v} ist verfügbar: öffne die Einstellungen",
     about: "Info", sourceCode: "Quellcode auf GitHub", website: "ArtistGrid-Website",
-    disclaimer: "Inoffizielle App, nicht mit ArtistGrid verbunden. Die Tracker gehören ihren Autoren.",
+    disclaimer: "Die offizielle ArtistGrid-App für Android. Die Tracker gehören ihren Autoren.",
   },
   pt: {
     eggCountdown: "Mais {n}…", eggCorner: "Canto! ×{n} 🎉",
@@ -217,6 +217,6 @@ const I18N = {
     upToDate: "Você está na versão mais recente", updateAvailable: "A versão {v} está disponível", download: "Baixar",
     updateError: "Não foi possível verificar atualizações", autoUpdates: "Verificar ao iniciar", newVersion: "A versão {v} está disponível: abra as Configurações",
     about: "Sobre", sourceCode: "Código-fonte no GitHub", website: "Site do ArtistGrid",
-    disclaimer: "App não oficial, sem vínculo com o ArtistGrid. Os trackers pertencem aos seus autores.",
+    disclaimer: "O app oficial do ArtistGrid para Android. Os trackers pertencem aos seus autores.",
   },
 };

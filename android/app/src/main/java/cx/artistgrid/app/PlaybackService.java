@@ -18,6 +18,9 @@ import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.ServiceCompat;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -92,6 +95,8 @@ public class PlaybackService extends Service {
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, s.durationMs > 0 ? s.durationMs : -1);
         if (artwork != null && s.artwork != null && s.artwork.equals(artworkUrl)) {
             meta.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artwork);
+            meta.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artwork);
+            meta.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, artwork);
         }
         session.setMetadata(meta.build());
         session.setPlaybackState(new PlaybackStateCompat.Builder()
@@ -128,7 +133,12 @@ public class PlaybackService extends Service {
         return b.build();
     }
 
-    /** Downloads the cover once per URL, off the main thread, then refreshes the notification. */
+    /**
+     * Loads the cover once per URL, off the main thread, then refreshes the notification. It
+     * comes from the app's cover cache when the player has already shown it, otherwise it is
+     * downloaded. Either way it is scaled down: media notifications and the lock screen drop
+     * bitmaps that are too large to pass to the system.
+     */
     private void loadArtwork(String url) {
         if (url == null || url.equals(artworkUrl)) return;
         artworkUrl = url;
@@ -136,10 +146,9 @@ public class PlaybackService extends Service {
         new Thread(() -> {
             Bitmap bmp = null;
             try {
-                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                c.setConnectTimeout(10000);
-                c.setReadTimeout(15000);
-                try (InputStream in = c.getInputStream()) { bmp = BitmapFactory.decodeStream(in); }
+                File cached = ProxyWebViewClient.coverFile(this, url);
+                byte[] data = cached.isFile() ? readAll(new FileInputStream(cached)) : download(url);
+                if (data != null) bmp = decodeScaled(data, ARTWORK_SIZE);
             } catch (Exception ignored) {}
             final Bitmap result = bmp;
             main.post(() -> {
@@ -148,6 +157,59 @@ public class PlaybackService extends Service {
                 refresh();
             });
         }).start();
+    }
+
+    private static final int ARTWORK_SIZE = 512;
+
+    /** Follows redirects across http/https (HttpURLConnection alone doesn't). */
+    private static byte[] download(String target) throws Exception {
+        URL url = new URL(target);
+        for (int i = 0; i < 6; i++) {
+            HttpURLConnection c = (HttpURLConnection) url.openConnection();
+            c.setInstanceFollowRedirects(false);
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(15000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android " + Build.VERSION.RELEASE + ") ArtistGrid");
+            c.setRequestProperty("Accept", "image/*,*/*");
+            int code = c.getResponseCode();
+            if (code >= 300 && code < 400 && c.getHeaderField("Location") != null) {
+                url = new URL(url, c.getHeaderField("Location"));
+                c.disconnect();
+                continue;
+            }
+            if (code != 200) return null;
+            return readAll(c.getInputStream());
+        }
+        return null;
+    }
+
+    private static byte[] readAll(InputStream stream) throws Exception {
+        try (InputStream in = stream) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+                if (out.size() > 8 * 1024 * 1024) return null;
+            }
+            return out.toByteArray();
+        }
+    }
+
+    private static Bitmap decodeScaled(byte[] data, int size) {
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(data, 0, data.length, o);
+        if (o.outWidth <= 0 || o.outHeight <= 0) return null;
+        o.inSampleSize = 1;
+        while (Math.max(o.outWidth, o.outHeight) / (o.inSampleSize * 2) >= size) o.inSampleSize *= 2;
+        o.inJustDecodeBounds = false;
+        Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length, o);
+        if (bmp == null) return null;
+        int max = Math.max(bmp.getWidth(), bmp.getHeight());
+        if (max <= size) return bmp;
+        float k = (float) size / max;
+        return Bitmap.createScaledBitmap(bmp, Math.round(bmp.getWidth() * k), Math.round(bmp.getHeight() * k), true);
     }
 
     private PendingIntent serviceIntent(String action, int code) {

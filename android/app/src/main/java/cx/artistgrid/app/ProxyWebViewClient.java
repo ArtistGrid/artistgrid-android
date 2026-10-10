@@ -176,6 +176,11 @@ public class ProxyWebViewClient extends BridgeWebViewClient {
         }
     }
 
+    /** Where the cover of this URL is cached once the app has shown it (see cachedImage). */
+    static File coverFile(android.content.Context ctx, String url) {
+        return new File(new File(ctx.getFilesDir(), "covers"), sha1(url));
+    }
+
     private static String sha1(String s) {
         try {
             byte[] d = MessageDigest.getInstance("SHA-1").digest(s.getBytes("UTF-8"));
