@@ -1,7 +1,7 @@
 "use strict";
 
 const APP_VERSION = "1.4.3"; // web fallback; inside the app the APK's own version is used
-const REPO = "mattcoc/artistgrid-android";
+const REPO = "ArtistGrid/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
 const ASSETS = "https://assets.artistgrid.cx/webp/";
