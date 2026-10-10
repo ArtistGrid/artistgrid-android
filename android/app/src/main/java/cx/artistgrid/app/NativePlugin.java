@@ -3,6 +3,7 @@ package cx.artistgrid.app;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioDeviceCallback;
@@ -15,6 +16,13 @@ import android.provider.Settings;
 import android.view.Window;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+import androidx.core.content.pm.PackageInfoCompat;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.JSObject;
@@ -180,6 +188,78 @@ public class NativePlugin extends Plugin {
         out.put("type", type);
         out.put("name", name);
         return out;
+    }
+
+    /** Installed version, read from the APK itself. */
+    @PluginMethod
+    public void getAppInfo(PluginCall call) {
+        try {
+            PackageInfo pi = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            JSObject ret = new JSObject();
+            ret.put("version", pi.versionName);
+            ret.put("build", PackageInfoCompat.getLongVersionCode(pi));
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(e.getMessage());
+        }
+    }
+
+    /**
+     * Downloads the new APK (reporting "updateProgress" events) and opens Android's installer.
+     * Resolves { needsPermission: true } after sending the user to allow installs from this app.
+     */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        String url = call.getString("url");
+        Context ctx = getContext();
+        if (url == null || !url.startsWith("https://")) { call.reject("Bad URL"); return; }
+        if (Build.VERSION.SDK_INT >= 26 && !ctx.getPackageManager().canRequestPackageInstalls()) {
+            Intent i = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+            JSObject ret = new JSObject();
+            ret.put("needsPermission", true);
+            call.resolve(ret);
+            return;
+        }
+        new Thread(() -> {
+            try {
+                File dir = new File(ctx.getCacheDir(), "updates");
+                dir.mkdirs();
+                File apk = new File(dir, "ArtistGrid.apk");
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(60000);
+                if (c.getResponseCode() != 200) throw new Exception("HTTP " + c.getResponseCode());
+                long size = c.getContentLengthLong(), done = 0;
+                int lastPct = -1;
+                try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        done += n;
+                        int pct = size > 0 ? (int) (done * 100 / size) : -1;
+                        if (pct != lastPct) {
+                            lastPct = pct;
+                            JSObject p = new JSObject();
+                            p.put("progress", pct);
+                            notifyListeners("updateProgress", p);
+                        }
+                    }
+                }
+                Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+                Intent i = new Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+                JSObject ret = new JSObject();
+                ret.put("started", true);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
+        }).start();
     }
 
     /** Light or dark system bar icons (and bar colour on Android versions that still colour them). */

@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.4.2"; // web fallback; inside the app the APK's own version is used
 const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -11,6 +11,8 @@ const PAGE = 60; // tracks rendered per batch
 // (no referrer, no CORS), which rescues blocked covers and lets the equalizer process audio.
 const NATIVE = !!window.Capacitor?.isNativePlatform?.();
 const proxied = (u) => "/_proxy?u=" + encodeURIComponent(u);
+// covers: same route, but kept on disk by the app after the first download (instant afterwards, also offline)
+const cachedImg = (u) => "/_proxy?c=1&u=" + encodeURIComponent(u);
 
 const $ = (s, r = document) => r.querySelector(s);
 const view = $("#view");
@@ -155,8 +157,9 @@ const lookupToken = (kind, artist, title = "") => `lookup:${kind}:${encodeURICom
 function candidates(urls) {
   const out = [];
   for (const u of urls.filter(Boolean)) {
+    // in the app: the on-disk copy first (downloaded natively on first use), the direct URL as fallback
+    if (NATIVE && /^https?:/.test(u)) out.push(cachedImg(u));
     out.push(u);
-    if (NATIVE && /^https?:/.test(u)) out.push(proxied(u));
   }
   return [...new Set(out)];
 }
@@ -185,8 +188,8 @@ function advanceImg(img) {
   const [, kind, artist, title] = src.split(":");
   lookupCover(kind, decodeURIComponent(artist), decodeURIComponent(title)).then((url) => {
     if (!url) return advanceImg(img);
-    img.dataset.next = [...(NATIVE ? [proxied(url)] : []).map(encodeURIComponent), ...rest].join(" ");
-    img.src = url;
+    img.dataset.next = [...(NATIVE ? [url] : []).map(encodeURIComponent), ...rest].join(" ");
+    img.src = NATIVE ? cachedImg(url) : url;
   });
 }
 document.addEventListener("error", (e) => {
@@ -934,6 +937,14 @@ function startCurrent(direct = false, autoplay = true) {
   if (npIsOpen()) renderNowPlaying();
   if (autoplay) syncNative();
   saveSession();
+  prefetchCovers();
+}
+// warm up the covers of the next tracks so they show instantly
+function prefetchCovers() {
+  for (const it of state.queue.slice(state.qIndex + 1, state.qIndex + 4)) {
+    const first = candidates(eraImgs(it.e, it.artist))[0];
+    if (first && !first.startsWith("lookup:")) new Image().src = first;
+  }
 }
 
 // ---------- resume where you left off ----------
@@ -952,6 +963,7 @@ function saveSession() {
 function restoreSession() {
   const s = store("last_session");
   if (!s?.queue?.length || !playableUrl(s.queue[0].t)) return;
+  for (const it of s.queue) fillEraCovers(it.artist, [it.e]);
   state.queue = s.queue;
   state.qIndex = 0;
   pendingSeek = s.position || 0;
@@ -1289,7 +1301,7 @@ async function checkUpdates() {
   const rel = await r.json();
   const version = String(rel.tag_name || "").replace(/^v/, "");
   const apk = (rel.assets || []).find((x) => /\.apk$/i.test(x.name));
-  state.update = version && cmpVer(version, APP_VERSION) > 0 ? { version, url: apk?.browser_download_url || rel.html_url, page: rel.html_url } : null;
+  state.update = version && cmpVer(version, await installedVersion()) > 0 ? { version, url: apk?.browser_download_url || rel.html_url, page: rel.html_url } : null;
   $("#gear")?.classList.toggle("dot", !!state.update);
   return state.update;
 }
@@ -1380,7 +1392,7 @@ async function renderSettings() {
       <h3>${esc(L("updates"))}</h3>
       <div class="rows">
         <div class="row">
-          <span class="lbl">${esc(L("version", { v: APP_VERSION }))}<small id="s-upd-status">${state.update ? esc(L("updateAvailable", { v: state.update.version })) : ""}</small></span>
+          <span class="lbl">${esc(L("version", { v: state.version || APP_VERSION }))}<small id="s-upd-status">${state.update ? esc(L("updateAvailable", { v: state.update.version })) : ""}</small></span>
           <button class="btn ${state.update ? "" : "ghost"}" id="s-upd">${esc(state.update ? L("download") : L("checkUpdates"))}</button>
         </div>
         <label class="row"><span class="lbl">${esc(L("autoUpdates"))}</span>${sw("s-autoupd", settings.autoUpdate)}</label>
@@ -1439,7 +1451,7 @@ async function renderSettings() {
 
   const upd = $("#s-upd"), status = $("#s-upd-status");
   upd.onclick = async () => {
-    if (state.update) return openExternal(state.update.url);
+    if (state.update) return downloadUpdate(upd, status);
     upd.disabled = true; upd.textContent = L("checking"); status.textContent = "";
     try {
       const u = await checkUpdates();
@@ -1452,6 +1464,30 @@ async function renderSettings() {
     upd.disabled = false;
   };
 }
+// the version really installed (from the APK), so the update check can't disagree with it
+async function installedVersion() {
+  if (!state.version) state.version = (await native("getAppInfo"))?.version || APP_VERSION;
+  return state.version;
+}
+onNative("updateProgress", (d) => {
+  const st = $("#s-upd-status");
+  if (st && d && d.progress >= 0) st.textContent = L("downloading", { p: d.progress });
+});
+async function downloadUpdate(btn, status) {
+  const u = state.update; if (!u) return;
+  if (!NATIVE_API || !/\.apk$/i.test(u.url)) return openExternal(u.url);
+  btn.disabled = true;
+  status.textContent = L("downloading", { p: 0 });
+  try {
+    const r = await window.Capacitor.nativePromise("ArtistGridNative", "installUpdate", { url: u.url });
+    status.textContent = r?.needsPermission ? L("allowInstall") : L("installing");
+  } catch {
+    status.textContent = L("updateError");
+    openExternal(u.page || u.url);
+  }
+  btn.disabled = false;
+}
+
 const fmtDb = (g) => (g > 0 ? "+" : "") + g + " dB";
 
 // ---------- external links ----------
@@ -1479,6 +1515,7 @@ setLanguage();
 applyLook();
 applyTheme();
 restoreSession();
+installedVersion();
 window.addEventListener("hashchange", route);
 route();
 setTimeout(autoCheckUpdates, 1500);
