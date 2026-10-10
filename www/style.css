@@ -533,7 +533,8 @@ body.in-sub #lens.ready { opacity: .45; }
 body:not(.is-playing) .np-cover { transform: scale(.88); }
 .np-meta { display: flex; align-items: center; gap: 12px; }
 .np-meta .txt { flex: 1; min-width: 0; }
-.np-meta h2 { margin: 0; font-size: 22px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* up to two lines, so "(feat. …)" after the title stays readable */
+.np-meta h2 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -.01em; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; word-break: break-word; }
 .np-meta .artist { display: block; max-width: 100%; padding: 0; margin-top: 3px; color: var(--muted); font-size: 15px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #np-fav.on { color: var(--fav); }
 #np-fav.on svg { fill: var(--fav); stroke: var(--fav); }

@@ -1,12 +1,8 @@
-The official ArtistGrid app, with album covers in the notification and cleaner sound.
-
-### What's new
-- **Official app**: ArtistGrid for Android is now the official app.
-- **Featured artists in titles**: "feat." and "with" credits now show next to the track title in the list, the player and the notification. Producer credits stay on the line below.
+Small fix for featured artists in titles.
 
 ### Fixed
-- **Album cover in the notification**: the cover now shows in the media notification, in the Live notifications panel and on the lock screen. It's taken from the covers the app has already loaded.
-- **Sound quality**: with the equalizer on, boosted presets no longer clip and distort on loud tracks. With the equalizer off or flat, the audio skips the equalizer completely. Playback uses larger audio buffers, so there are fewer crackles with the screen off.
+- **Featured artists**: in the track list, "feat." and "with" credits are back on the line under the title, as before. The player, the queue and the notification still show them next to the title.
+- **Full-screen player**: long titles now wrap onto two lines, so the "(feat. …)" part stays readable.
 
 ### Installation
 Update from **Settings → Updates** in the app, or download **ArtistGrid.apk** below. Installs over the previous version and keeps your favorites. Requires Android 6.0+.

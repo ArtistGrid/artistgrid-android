@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.5.4"; // web fallback; inside the app the APK's own version is used
+const APP_VERSION = "1.5.5"; // web fallback; inside the app the APK's own version is used
 const REPO = "ArtistGrid/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -795,20 +795,17 @@ function appendTracks(container, items, showEra, from = 0) {
   }
 }
 
-// Track credits look like "(with X) (feat. Y & Z) (prod. W)". Featured artists ("feat.", "ft.",
-// "with") are shown with the title everywhere (list, player, notification); the rest (producers…)
-// stays on the line under the title.
+// Track credits look like "(with X) (feat. Y & Z) (prod. W)". In the track list they all stay on
+// the line under the title; in the player, the queue and the notification the featured artists
+// ("feat.", "ft.", "with") are added to the title.
 const FEAT_RE = /^\(\s*(feat\.?|ft\.?|featuring|with)\s/i;
-function splitCredits(t) {
+function featCredits(t) {
   const raw = Array.isArray(t.name?.credits) ? t.name.credits.join(" ") : String(t.name?.credits ?? "");
-  const groups = raw.match(/\([^()]*\)/g) || [];
-  const feats = groups.filter((g) => FEAT_RE.test(g));
-  const rest = feats.reduce((s, g) => s.replace(g, ""), raw).replace(/\s+/g, " ").trim();
-  return { feats, rest };
+  return (raw.match(/\([^()]*\)/g) || []).filter((g) => FEAT_RE.test(g));
 }
 function trackTitle(t) {
   const base = String(t.name?.title || t.name?.raw || (typeof t.name === "string" ? t.name : "")).trim();
-  const feats = splitCredits(t).feats.filter((g) => !base.includes(g));
+  const feats = featCredits(t).filter((g) => !base.includes(g));
   return [base, ...feats].join(" ");
 }
 
@@ -824,8 +821,8 @@ function trackEl(item, showEra) {
   const el = document.createElement("div");
   el.className = "track";
   el._item = item;
-  const title = trackTitle(t);
-  const credits = splitCredits(t).rest;
+  const title = String(t.name?.title ?? t.name?.raw ?? t.name ?? "");
+  const credits = (Array.isArray(t.name?.credits) ? t.name.credits : []).join(" ");
   const playable = !!playableUrl(t);
   const on = cur() && cur().t === t;
   if (on) el.classList.add("playing");
