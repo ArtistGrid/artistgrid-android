@@ -137,14 +137,15 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .icon-btn:active, .chip:active, .track .play:active, .pill-link:active, .card:active, .btn:active { transform: scale(.94); }
 
 #view {
-  padding: 0 14px calc(var(--chrome) + 24px);
+  --gutter: 14px;
+  padding: 0 var(--gutter) calc(var(--chrome) + 24px);
   max-width: 900px; margin: 0 auto;
 }
 
 /* ---------- Sticky glass header (title + search) ---------- */
 .head {
   position: sticky; top: 0; z-index: 15;
-  margin: 0 -14px; padding: calc(10px + var(--safe-top)) 14px 10px;
+  margin: 0 calc(-1 * var(--gutter)); padding: calc(10px + var(--safe-top)) var(--gutter) 10px;
   isolation: isolate;
 }
 /* the glass fades in on its own layer once content scrolls underneath */
@@ -579,6 +580,50 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
 .q-item span { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .q-item.cur b { color: var(--fav); }
 .np-device, .pill { background: var(--pill-fill); border: 1px solid var(--pill-stroke); box-shadow: var(--pill-shadow); }
+
+/* ---------- Tablets and large screens ---------- */
+@media (min-width: 768px) {
+  :root { --dock-h: 64px; --player-h: 68px; }
+  #view { --gutter: 28px; max-width: 1320px; }
+  .head-row h1 { font-size: 32px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  body.compact .grid { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; }
+  .card .name { font-size: 15px; padding: 32px 13px 12px; }
+  /* settings read better as a centred column */
+  #view[data-page="settings"] { max-width: 760px; }
+  .backdrop { height: 420px; }
+  #dock { width: min(100% - 48px, 540px); }
+  #player { width: min(100% - 48px, 680px); }
+  .np-scroll { max-width: 640px; }
+  .q-item .thumb { width: 46px; height: 46px; }
+}
+/* wide screens: the tracks of an era in two columns */
+@media (min-width: 1000px) {
+  .era-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .era.open .era-body { display: grid; }
+  .era-body > .era-desc, .era-body > .state, .era-body > .more { grid-column: 1 / -1; }
+  .era-body > .era-desc { padding-bottom: 10px; }
+  .era-body > .track:nth-child(odd of .track) { border-right: 1px solid var(--border); }
+  /* every row gets its bottom line; the era's own border hides the last one */
+  .era-body > .track:last-child { border-bottom: 1px solid var(--border); }
+  .era-body { margin-bottom: -1px; }
+}
+/* landscape tablets: full-screen player with the cover on the left, everything else on the right */
+@media (min-width: 900px) and (orientation: landscape) {
+  .np-scroll {
+    max-width: 1180px; display: grid; column-gap: 56px; align-content: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "top top" "cover meta" "cover seek" "cover controls" "cover extra" "cover queue";
+    grid-template-rows: auto auto auto auto auto 1fr;
+  }
+  .np-top { grid-area: top; }
+  .np-cover { grid-area: cover; align-self: start; position: sticky; top: 0; width: min(100%, calc(100vh - 140px)); margin: 8px auto 0; }
+  .np-meta { grid-area: meta; margin-top: 12px; }
+  .np-seek { grid-area: seek; }
+  .np-controls { grid-area: controls; }
+  .np-extra { grid-area: extra; }
+  .np-queue { grid-area: queue; }
+}
 
 /* ---------- Settings: style + colour pickers ---------- */
 .style-pick { display: flex; gap: 10px; margin-top: 10px; }

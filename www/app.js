@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.5.5"; // web fallback; inside the app the APK's own version is used
+const APP_VERSION = "1.5.6"; // web fallback; inside the app the APK's own version is used
 const REPO = "ArtistGrid/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -1823,6 +1823,8 @@ function route() {
   document.body.classList.remove("scrolled");
   view.classList.remove("searching");
   state.artistName = "";
+  // lets the layout adapt per page (e.g. narrower settings on tablets)
+  view.dataset.page = parts[0] === "a" && parts[1] ? "artist" : parts[0] === "settings" ? "settings" : "home";
   if (parts[0] === "a" && parts[1]) renderArtist(parts[1], parts[2]);
   else if (parts[0] === "settings") renderSettings();
   else renderHome(FILTER_ROUTES[parts[0]] ? parts[0] : "all");
