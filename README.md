@@ -1,44 +1,44 @@
-# ArtistGrid per Android
+# ArtistGrid for Android
 
-App Android **non ufficiale** per [ArtistGrid](https://artistgrid.cx), la raccolta dei tracker di musica inedita.
-Sfoglia gli artisti, esplora i tracker per era e ascolta i brani direttamente dal telefono, con un'interfaccia pensata per lo smartphone.
+An **unofficial** Android app for [ArtistGrid](https://artistgrid.cx), the collection of unreleased music trackers.
+Browse artists, explore trackers era by era and listen to tracks right from your phone, with an interface built for mobile.
 
-> Questo progetto non è affiliato ad ArtistGrid. Tutti i dati arrivano dalle API pubbliche del sito e i tracker appartengono ai rispettivi autori, citati nell'app.
+> This project is not affiliated with ArtistGrid. All data comes from the site's public APIs, and the trackers belong to their respective authors, who are credited in the app.
 
-## Funzionalità
+## Features
 
-- **Griglia degli artisti**: oltre 580 artisti con foto, ricerca istantanea e filtri (Tutti, ♥ Preferiti, ★ Consigliati, Aggiornati).
-- **Tracker completi**: tutte le schede (Unreleased, Released, Recent, Best Of, Stems…), con ere, copertine, descrizioni e statistiche.
-- **Dettagli dei brani**: qualità, durata disponibile, data di leak, crediti, note e link.
-- **Ricerca nei brani**: cerca in tutto il tracker per titolo, note o era, con i filtri *Ascoltabili*, *Full* e *Snippet*.
-- **Player integrato**: play/pausa, precedente/successivo, barra di avanzamento. Al termine di un brano parte il successivo dell'era.
-- **Preferiti**: salva gli artisti che segui.
-- **Uso offline**: i tracker già aperti restano consultabili senza connessione, e una copia della lista artisti è inclusa nell'app.
-- **Link esterni**: gli artisti che hanno un sito tracker proprio (es. Frank Ocean) si aprono nel browser.
+- **Artist grid**: 580+ artists with photos, instant search and filters (All, ♥ Favorites, ★ Recommended, Updated).
+- **Full trackers**: every tab (Unreleased, Released, Recent, Best Of, Stems…), with eras, cover art, descriptions and stats.
+- **Track details**: quality, available length, leak date, credits, notes and links.
+- **Track search**: search the whole tracker by title, notes or era, with *Playable*, *Full* and *Snippet* filters.
+- **Built-in player**: play/pause, previous/next and a progress bar. When a track ends, the next one in the era starts.
+- **Favorites**: save the artists you follow.
+- **Offline use**: trackers you have already opened stay available without a connection, and a copy of the artist list ships with the app.
+- **External links**: artists with their own tracker site (e.g. Frank Ocean) open in the browser.
 
-## Installazione
+## Installation
 
-1. Scarica `ArtistGrid.apk` dalla pagina [Releases](../../releases).
-2. Aprilo sul telefono e consenti l'installazione da "origini sconosciute".
+1. Download `ArtistGrid.apk` from the [Releases](../../releases) page.
+2. Open it on your phone and allow installation from unknown sources.
 
-Richiede Android 6.0 o superiore.
+Requires Android 6.0 or later.
 
-## Come funziona
+## How it works
 
-È un'app [Capacitor](https://capacitorjs.com): l'interfaccia è HTML/CSS/JavaScript puro in [`www/`](www), senza framework né build step. I dati arrivano da:
+It is a [Capacitor](https://capacitorjs.com) app: the interface is plain HTML/CSS/JavaScript in [`www/`](www), with no framework and no build step. Data comes from:
 
-| Dato | Endpoint |
+| Data | Endpoint |
 | --- | --- |
-| Lista artisti | `https://artists.artistgrid.cx/artists.csv` |
-| Tracker | `https://trackerapi.artistgrid.cx/sh/<id>/` · `/sh/<id>/tab/<scheda>` |
-| Foto artisti | `https://assets.artistgrid.cx/webp/<nome>.webp` |
-| Audio | link pillows.su, pixeldrain e Google Drive risolti come sul sito |
+| Artist list | `https://artists.artistgrid.cx/artists.csv` |
+| Trackers | `https://trackerapi.artistgrid.cx/sh/<id>/` · `/sh/<id>/tab/<tab>` |
+| Artist photos | `https://assets.artistgrid.cx/webp/<name>.webp` |
+| Audio | pillows.su, pixeldrain and Google Drive links, resolved the same way as on the site |
 
-Le richieste passano dal client HTTP nativo di Capacitor (`CapacitorHttp`), così l'app non dipende dalle regole CORS. I tracker scaricati vengono salvati in IndexedDB per l'uso offline.
+Requests go through Capacitor's native HTTP client (`CapacitorHttp`), so the app does not depend on CORS rules. Downloaded trackers are stored in IndexedDB for offline use.
 
-## Compilare da sorgente
+## Building from source
 
-Requisiti: Node.js 18+, JDK 21, Android SDK (platform 35, build-tools 35).
+Requirements: Node.js 18+, JDK 21, Android SDK (platform 35, build-tools 35).
 
 ```bash
 npm install
@@ -47,22 +47,23 @@ cd android
 ./gradlew assembleDebug
 ```
 
-L'APK viene generato in `android/app/build/outputs/apk/debug/app-debug.apk`.
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-> Su Windows Gradle può fallire se il progetto si trova in un percorso molto lungo: in quel caso spostalo in una cartella corta, es. `C:\dev\artistgrid-android`.
+> On Windows, Gradle can fail if the project sits in a very long path. If that happens, move it to a short folder such as `C:\dev\artistgrid-android`.
 
-Per provare l'interfaccia nel browser durante lo sviluppo:
+To try the interface in a browser during development:
 
 ```bash
 python -m http.server 8765 -d www
 ```
 
-## Limiti noti
+## Known limitations
 
-- Con lo schermo spento Android può mettere in pausa la riproduzione (non c'è ancora un servizio audio in background).
-- Si riproducono direttamente i link pillows.su, pixeldrain e Google Drive; gli altri link si aprono esternamente.
-- L'APK pubblicato è una build di debug, non firmata per il Play Store.
+- With the screen off, Android may pause playback (there is no background audio service yet).
+- Only pillows.su, pixeldrain and Google Drive links play in the app; other links open externally.
+- The published APK is a debug build, not signed for the Play Store.
+- The app interface is currently in Italian.
 
-## Licenza
+## License
 
-Codice rilasciato sotto licenza [MIT](LICENSE). I dati e le immagini appartengono ad ArtistGrid e ai curatori dei tracker.
+Code released under the [MIT](LICENSE) license. Data and images belong to ArtistGrid and the tracker curators.

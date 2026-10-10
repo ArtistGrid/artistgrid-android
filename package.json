@@ -1,7 +1,7 @@
 {
   "name": "artistgrid-android",
   "version": "1.0.0",
-  "description": "App Android non ufficiale per ArtistGrid: sfoglia e ascolta i tracker di musica inedita.",
+  "description": "Unofficial Android app for ArtistGrid: browse and listen to unreleased music trackers.",
   "scripts": {
     "sync": "cap sync android",
     "build": "cap sync android && cd android && gradlew.bat assembleDebug"
