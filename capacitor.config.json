@@ -1,0 +1,12 @@
+{
+  "appId": "cx.artistgrid.app",
+  "appName": "ArtistGrid",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  },
+  "android": {
+    "backgroundColor": "#000000"
+  }
+}

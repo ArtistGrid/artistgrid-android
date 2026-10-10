@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ArtistGrid</string>
+    <string name="title_activity_main">ArtistGrid</string>
+    <string name="package_name">cx.artistgrid.app</string>
+    <string name="custom_url_scheme">cx.artistgrid.app</string>
+</resources>
