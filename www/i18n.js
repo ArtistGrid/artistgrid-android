@@ -4,6 +4,7 @@ const LANG_NAMES = { en: "English", it: "Italiano", es: "Español", fr: "França
 
 const I18N = {
   en: {
+    eggCountdown: "{n} more…", eggCorner: "Corner! ×{n} 🎉",
     downloading: "Downloading… {p}%", installing: "Opening the installer…", allowInstall: "Allow \"Install unknown apps\" for ArtistGrid, then tap Download again",
     details: "Details", haptics: "Vibration on taps",
     close: "Close", playingFrom: "Playing from", openArtist: "Open artist", seek: "Seek", shuffle: "Shuffle", repeat: "Repeat", upNext: "Up next", queueEnd: "Nothing else in the queue", shuffleOn: "Shuffle on", shuffleOff: "Shuffle off", repeat_off: "Repeat off", repeat_all: "Repeat all", repeat_one: "Repeat this track", outBluetooth: "Bluetooth", outWired: "Headphones", outPhone: "This phone", outputOnlyApp: "Choosing the audio output works in the Android app.", outputUnavailable: "Couldn't open the audio output picker", theme: "Theme", theme_system: "System", theme_dark: "Dark", theme_light: "Light", themeToggle: "Light or dark mode", bgPlay: "Background playback", bgPlayNote: "Keeps playing with the screen off, with controls in the notification and on the lock screen.",
@@ -25,7 +26,7 @@ const I18N = {
     showMore: "Show more ({n})", cantPlay: "Can't play this track", audioError: "Error loading audio",
     settings: "Settings", language: "Language", langAuto: "Device language",
     eq: "Equalizer", eqEnable: "Enable equalizer", eqOnlyApp: "The equalizer works only in the Android app.",
-    eqPresets: { flat: "Flat", bass: "Bass boost", vocal: "Vocals", treble: "Treble", loud: "Loudness" },
+    eqPresets: { flat: "Flat", bass: "Bass boost", hiphop: "Hip-hop", trap: "Trap", rnb: "R&B", pop: "Pop", rock: "Rock", electronic: "Electronic", vocal: "Vocals", acoustic: "Acoustic", treble: "Treble", loud: "Loudness", night: "Night", bassCut: "Less bass" },
     playback: "Playback", autoplay: "Play the next track automatically", speed: "Playback speed",
     appearance: "Appearance", compactGrid: "Compact artist grid", reduceMotion: "Reduce animations",
     storage: "Storage", cacheInfo: ["{n} tracker saved for offline use", "{n} trackers saved for offline use"],
@@ -37,6 +38,7 @@ const I18N = {
     disclaimer: "Unofficial app, not affiliated with ArtistGrid. Trackers belong to their authors.",
   },
   it: {
+    eggCountdown: "Ancora {n}…", eggCorner: "Angolo! ×{n} 🎉",
     downloading: "Download… {p}%", installing: "Apro l'installazione…", allowInstall: "Consenti \"Installa app sconosciute\" per ArtistGrid, poi tocca di nuovo Scarica",
     details: "Dettagli", haptics: "Vibrazione al tocco",
     close: "Chiudi", playingFrom: "In riproduzione da", openArtist: "Apri artista", seek: "Posizione", shuffle: "Casuale", repeat: "Ripeti", upNext: "Prossimi brani", queueEnd: "Nessun altro brano in coda", shuffleOn: "Riproduzione casuale attiva", shuffleOff: "Riproduzione casuale disattivata", repeat_off: "Ripetizione disattivata", repeat_all: "Ripeti tutto", repeat_one: "Ripeti questo brano", outBluetooth: "Bluetooth", outWired: "Cuffie", outPhone: "Questo telefono", outputOnlyApp: "La scelta dell'uscita audio funziona nell'app Android.", outputUnavailable: "Impossibile aprire la scelta dell'uscita audio", theme: "Tema", theme_system: "Sistema", theme_dark: "Scuro", theme_light: "Chiaro", themeToggle: "Modalità chiara o scura", bgPlay: "Riproduzione in background", bgPlayNote: "Continua a suonare a schermo spento, con i controlli nella notifica e sulla schermata di blocco.",
@@ -58,7 +60,7 @@ const I18N = {
     showMore: "Mostra altri ({n})", cantPlay: "Impossibile riprodurre questo brano", audioError: "Errore nel caricamento audio",
     settings: "Impostazioni", language: "Lingua", langAuto: "Lingua del dispositivo",
     eq: "Equalizzatore", eqEnable: "Attiva equalizzatore", eqOnlyApp: "L'equalizzatore funziona solo nell'app Android.",
-    eqPresets: { flat: "Piatto", bass: "Bassi", vocal: "Voce", treble: "Alti", loud: "Loudness" },
+    eqPresets: { flat: "Piatto", bass: "Bassi", hiphop: "Hip-hop", trap: "Trap", rnb: "R&B", pop: "Pop", rock: "Rock", electronic: "Elettronica", vocal: "Voce", acoustic: "Acustica", treble: "Alti", loud: "Loudness", night: "Notte", bassCut: "Meno bassi" },
     playback: "Riproduzione", autoplay: "Riproduci automaticamente il brano successivo", speed: "Velocità di riproduzione",
     appearance: "Aspetto", compactGrid: "Griglia artisti compatta", reduceMotion: "Riduci animazioni",
     storage: "Archiviazione", cacheInfo: ["{n} tracker salvato offline", "{n} tracker salvati offline"],
@@ -70,6 +72,7 @@ const I18N = {
     disclaimer: "App non ufficiale, non affiliata ad ArtistGrid. I tracker appartengono ai rispettivi autori.",
   },
   es: {
+    eggCountdown: "{n} más…", eggCorner: "¡Esquina! ×{n} 🎉",
     downloading: "Descargando… {p}%", installing: "Abriendo el instalador…", allowInstall: "Permite \"Instalar apps desconocidas\" para ArtistGrid y vuelve a tocar Descargar",
     details: "Detalles", haptics: "Vibración al tocar",
     close: "Cerrar", playingFrom: "Reproduciendo desde", openArtist: "Abrir artista", seek: "Posición", shuffle: "Aleatorio", repeat: "Repetir", upNext: "A continuación", queueEnd: "No hay más canciones en la cola", shuffleOn: "Aleatorio activado", shuffleOff: "Aleatorio desactivado", repeat_off: "Repetición desactivada", repeat_all: "Repetir todo", repeat_one: "Repetir esta canción", outBluetooth: "Bluetooth", outWired: "Auriculares", outPhone: "Este teléfono", outputOnlyApp: "Elegir la salida de audio funciona en la app de Android.", outputUnavailable: "No se pudo abrir el selector de salida de audio", theme: "Tema", theme_system: "Sistema", theme_dark: "Oscuro", theme_light: "Claro", themeToggle: "Modo claro u oscuro", bgPlay: "Reproducción en segundo plano", bgPlayNote: "Sigue sonando con la pantalla apagada, con controles en la notificación y en la pantalla de bloqueo.",
@@ -91,7 +94,7 @@ const I18N = {
     showMore: "Mostrar más ({n})", cantPlay: "No se puede reproducir esta canción", audioError: "Error al cargar el audio",
     settings: "Ajustes", language: "Idioma", langAuto: "Idioma del dispositivo",
     eq: "Ecualizador", eqEnable: "Activar ecualizador", eqOnlyApp: "El ecualizador solo funciona en la app de Android.",
-    eqPresets: { flat: "Plano", bass: "Graves", vocal: "Voces", treble: "Agudos", loud: "Loudness" },
+    eqPresets: { flat: "Plano", bass: "Graves", hiphop: "Hip-hop", trap: "Trap", rnb: "R&B", pop: "Pop", rock: "Rock", electronic: "Electrónica", vocal: "Voces", acoustic: "Acústica", treble: "Agudos", loud: "Loudness", night: "Noche", bassCut: "Menos graves" },
     playback: "Reproducción", autoplay: "Reproducir la siguiente canción automáticamente", speed: "Velocidad de reproducción",
     appearance: "Apariencia", compactGrid: "Cuadrícula compacta", reduceMotion: "Reducir animaciones",
     storage: "Almacenamiento", cacheInfo: ["{n} tracker guardado sin conexión", "{n} trackers guardados sin conexión"],
@@ -103,6 +106,7 @@ const I18N = {
     disclaimer: "App no oficial, sin relación con ArtistGrid. Los trackers pertenecen a sus autores.",
   },
   fr: {
+    eggCountdown: "Encore {n}…", eggCorner: "Coin ! ×{n} 🎉",
     downloading: "Téléchargement… {p}%", installing: "Ouverture de l'installateur…", allowInstall: "Autorisez « Installer des applis inconnues » pour ArtistGrid, puis touchez à nouveau Télécharger",
     details: "Détails", haptics: "Vibration au toucher",
     close: "Fermer", playingFrom: "Lecture depuis", openArtist: "Ouvrir l'artiste", seek: "Position", shuffle: "Aléatoire", repeat: "Répéter", upNext: "À suivre", queueEnd: "Plus rien dans la file d'attente", shuffleOn: "Lecture aléatoire activée", shuffleOff: "Lecture aléatoire désactivée", repeat_off: "Répétition désactivée", repeat_all: "Tout répéter", repeat_one: "Répéter ce titre", outBluetooth: "Bluetooth", outWired: "Casque", outPhone: "Ce téléphone", outputOnlyApp: "Le choix de la sortie audio fonctionne dans l'app Android.", outputUnavailable: "Impossible d'ouvrir le choix de la sortie audio", theme: "Thème", theme_system: "Système", theme_dark: "Sombre", theme_light: "Clair", themeToggle: "Mode clair ou sombre", bgPlay: "Lecture en arrière-plan", bgPlayNote: "Continue écran éteint, avec les commandes dans la notification et sur l'écran de verrouillage.",
@@ -124,7 +128,7 @@ const I18N = {
     showMore: "Afficher plus ({n})", cantPlay: "Impossible de lire ce titre", audioError: "Erreur de chargement audio",
     settings: "Réglages", language: "Langue", langAuto: "Langue de l'appareil",
     eq: "Égaliseur", eqEnable: "Activer l'égaliseur", eqOnlyApp: "L'égaliseur fonctionne uniquement dans l'app Android.",
-    eqPresets: { flat: "Neutre", bass: "Basses", vocal: "Voix", treble: "Aigus", loud: "Loudness" },
+    eqPresets: { flat: "Neutre", bass: "Basses", hiphop: "Hip-hop", trap: "Trap", rnb: "R&B", pop: "Pop", rock: "Rock", electronic: "Électro", vocal: "Voix", acoustic: "Acoustique", treble: "Aigus", loud: "Loudness", night: "Nuit", bassCut: "Moins de basses" },
     playback: "Lecture", autoplay: "Lire automatiquement le titre suivant", speed: "Vitesse de lecture",
     appearance: "Apparence", compactGrid: "Grille compacte", reduceMotion: "Réduire les animations",
     storage: "Stockage", cacheInfo: ["{n} tracker enregistré hors ligne", "{n} trackers enregistrés hors ligne"],
@@ -136,6 +140,7 @@ const I18N = {
     disclaimer: "App non officielle, non affiliée à ArtistGrid. Les trackers appartiennent à leurs auteurs.",
   },
   de: {
+    eggCountdown: "Noch {n}…", eggCorner: "Ecke! ×{n} 🎉",
     downloading: "Wird geladen… {p}%", installing: "Installation wird geöffnet…", allowInstall: "Erlaube „Unbekannte Apps installieren“ für ArtistGrid und tippe erneut auf Herunterladen",
     details: "Details", haptics: "Vibration beim Tippen",
     close: "Schließen", playingFrom: "Wiedergabe aus", openArtist: "Künstler öffnen", seek: "Position", shuffle: "Zufällig", repeat: "Wiederholen", upNext: "Als Nächstes", queueEnd: "Nichts mehr in der Warteschlange", shuffleOn: "Zufallswiedergabe an", shuffleOff: "Zufallswiedergabe aus", repeat_off: "Wiederholen aus", repeat_all: "Alle wiederholen", repeat_one: "Diesen Titel wiederholen", outBluetooth: "Bluetooth", outWired: "Kopfhörer", outPhone: "Dieses Telefon", outputOnlyApp: "Die Wahl der Audioausgabe funktioniert in der Android-App.", outputUnavailable: "Audioausgabe-Auswahl konnte nicht geöffnet werden", theme: "Design", theme_system: "System", theme_dark: "Dunkel", theme_light: "Hell", themeToggle: "Heller oder dunkler Modus", bgPlay: "Hintergrundwiedergabe", bgPlayNote: "Spielt bei ausgeschaltetem Bildschirm weiter, mit Steuerung in der Benachrichtigung und auf dem Sperrbildschirm.",
@@ -157,7 +162,7 @@ const I18N = {
     showMore: "Mehr anzeigen ({n})", cantPlay: "Dieser Titel kann nicht abgespielt werden", audioError: "Fehler beim Laden des Audios",
     settings: "Einstellungen", language: "Sprache", langAuto: "Gerätesprache",
     eq: "Equalizer", eqEnable: "Equalizer aktivieren", eqOnlyApp: "Der Equalizer funktioniert nur in der Android-App.",
-    eqPresets: { flat: "Neutral", bass: "Bass", vocal: "Stimme", treble: "Höhen", loud: "Loudness" },
+    eqPresets: { flat: "Neutral", bass: "Bass", hiphop: "Hip-Hop", trap: "Trap", rnb: "R&B", pop: "Pop", rock: "Rock", electronic: "Elektronisch", vocal: "Stimme", acoustic: "Akustik", treble: "Höhen", loud: "Loudness", night: "Nacht", bassCut: "Weniger Bass" },
     playback: "Wiedergabe", autoplay: "Nächsten Titel automatisch abspielen", speed: "Wiedergabegeschwindigkeit",
     appearance: "Darstellung", compactGrid: "Kompaktes Raster", reduceMotion: "Animationen reduzieren",
     storage: "Speicher", cacheInfo: ["{n} Tracker offline gespeichert", "{n} Tracker offline gespeichert"],
@@ -169,6 +174,7 @@ const I18N = {
     disclaimer: "Inoffizielle App, nicht mit ArtistGrid verbunden. Die Tracker gehören ihren Autoren.",
   },
   pt: {
+    eggCountdown: "Mais {n}…", eggCorner: "Canto! ×{n} 🎉",
     downloading: "Baixando… {p}%", installing: "Abrindo o instalador…", allowInstall: "Permita \"Instalar apps desconhecidos\" para o ArtistGrid e toque em Baixar de novo",
     details: "Detalhes", haptics: "Vibração ao tocar",
     close: "Fechar", playingFrom: "Tocando de", openArtist: "Abrir artista", seek: "Posição", shuffle: "Aleatório", repeat: "Repetir", upNext: "A seguir", queueEnd: "Nada mais na fila", shuffleOn: "Aleatório ativado", shuffleOff: "Aleatório desativado", repeat_off: "Repetição desativada", repeat_all: "Repetir tudo", repeat_one: "Repetir esta faixa", outBluetooth: "Bluetooth", outWired: "Fones de ouvido", outPhone: "Este telefone", outputOnlyApp: "A escolha da saída de áudio funciona no app Android.", outputUnavailable: "Não foi possível abrir a escolha da saída de áudio", theme: "Tema", theme_system: "Sistema", theme_dark: "Escuro", theme_light: "Claro", themeToggle: "Modo claro ou escuro", bgPlay: "Reprodução em segundo plano", bgPlayNote: "Continua tocando com a tela desligada, com controles na notificação e na tela de bloqueio.",
@@ -190,7 +196,7 @@ const I18N = {
     showMore: "Mostrar mais ({n})", cantPlay: "Não foi possível reproduzir esta faixa", audioError: "Erro ao carregar o áudio",
     settings: "Configurações", language: "Idioma", langAuto: "Idioma do dispositivo",
     eq: "Equalizador", eqEnable: "Ativar equalizador", eqOnlyApp: "O equalizador funciona apenas no app Android.",
-    eqPresets: { flat: "Neutro", bass: "Graves", vocal: "Vocais", treble: "Agudos", loud: "Loudness" },
+    eqPresets: { flat: "Neutro", bass: "Graves", hiphop: "Hip-hop", trap: "Trap", rnb: "R&B", pop: "Pop", rock: "Rock", electronic: "Eletrônica", vocal: "Vocais", acoustic: "Acústico", treble: "Agudos", loud: "Loudness", night: "Noite", bassCut: "Menos graves" },
     playback: "Reprodução", autoplay: "Reproduzir a próxima faixa automaticamente", speed: "Velocidade de reprodução",
     appearance: "Aparência", compactGrid: "Grade compacta", reduceMotion: "Reduzir animações",
     storage: "Armazenamento", cacheInfo: ["{n} tracker salvo offline", "{n} trackers salvos offline"],

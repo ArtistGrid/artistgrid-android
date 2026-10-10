@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.4.2"; // web fallback; inside the app the APK's own version is used
+const APP_VERSION = "1.4.3"; // web fallback; inside the app the APK's own version is used
 const REPO = "mattcoc/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -34,7 +34,23 @@ function store(key, val) {
 
 // ---------- settings ----------
 const EQ_FREQS = [60, 230, 910, 3600, 14000];
-const EQ_PRESETS = { flat: [0, 0, 0, 0, 0], bass: [6, 4, 0, 0, 0], vocal: [-2, 0, 3, 4, 1], treble: [0, 0, 0, 3, 6], loud: [5, 2, -1, 2, 5] };
+// gains in dB for 60 Hz · 230 Hz · 910 Hz · 3.6 kHz · 14 kHz
+const EQ_PRESETS = {
+  flat: [0, 0, 0, 0, 0],
+  bass: [6, 4, 0, 0, 0],
+  hiphop: [6, 3, -1, 1, 3],
+  trap: [8, 4, -2, 1, 4],
+  rnb: [5, 3, 0, 2, 2],
+  pop: [-1, 2, 4, 2, -1],
+  rock: [4, 2, -2, 2, 4],
+  electronic: [5, 1, -1, 2, 5],
+  vocal: [-2, 0, 3, 4, 1],
+  acoustic: [3, 1, 1, 2, 2],
+  treble: [0, 0, 0, 3, 6],
+  loud: [5, 2, -1, 2, 5],
+  night: [-3, 0, 1, 0, -4],
+  bassCut: [-6, -3, 0, 0, 0],
+};
 const SPEEDS = [0.75, 1, 1.25, 1.5];
 const DEFAULTS = {
   lang: "auto", eqOn: false, eqPreset: "flat", eqGains: [0, 0, 0, 0, 0],
@@ -386,7 +402,7 @@ async function renderHome(filter = "all") {
   view.innerHTML = `
     <div class="head">
       <div class="head-row">
-        <h1>${esc(title)}</h1>
+        <h1 id="home-title">${esc(title)}</h1>
         <span class="count" id="count"></span>
         <button id="theme-btn" class="icon-btn round" aria-label="${esc(L("themeToggle"))}">${THEME_ICONS[resolvedTheme()]}</button>
         <button id="gear" class="icon-btn round ${state.update ? "dot" : ""}" aria-label="${esc(L("settings"))}">${ICONS.gear}</button>
@@ -398,6 +414,7 @@ async function renderHome(filter = "all") {
   q.oninput = () => { state.query = q.value; drawGrid(); };
   $("#gear").onclick = () => (location.hash = "#/settings");
   $("#theme-btn").onclick = toggleTheme;
+  $("#home-title").onclick = titleTapped;
   $("#grid").onclick = (e) => {
     const c = e.target.closest(".card"); if (!c) return;
     const a = state.artists[c.dataset.i];
@@ -1489,6 +1506,65 @@ async function downloadUpdate(btn, status) {
 }
 
 const fmtDb = (g) => (g > 0 ? "+" : "") + g + " dB";
+
+// ---------- easter egg: 7 taps on the title ----------
+// A random top artist's photo bounces around the screen like the old DVD logo, changing colour on
+// every wall and celebrating when it hits a corner. Tap it (or Back) to stop.
+let eggTaps = 0, eggTimer = 0;
+function titleTapped() {
+  clearTimeout(eggTimer);
+  eggTimer = setTimeout(() => (eggTaps = 0), 1500);
+  eggTaps++;
+  if (eggTaps >= 4 && eggTaps < 7) toast(L("eggCountdown", { n: 7 - eggTaps }), 900);
+  if (eggTaps >= 7) { eggTaps = 0; startDvd(); }
+}
+function startDvd() {
+  if ($("#dvd")) return;
+  // famous artists with a tracker in the app (not the entries that point to an external site)
+  const pool = state.artists.filter((a) => a.best === "true" && isSheetId(a.url));
+  const a = (pool.length ? pool : state.artists)[Math.floor(Math.random() * (pool.length || state.artists.length))];
+  if (!a) return;
+  haptic(30);
+  const wrap = document.createElement("div");
+  wrap.id = "dvd";
+  wrap.innerHTML = `<div class="dvd-logo" style="${phStyle(a.name)}">
+      <div class="thumb">${initial(a.name)}${imgTag(artistImgs(a.name), false)}</div>
+      <span>${esc(a.name.replace(/\s*\(.*?\)\s*/g, " ").trim())}</span>
+    </div>`;
+  document.body.appendChild(wrap);
+  const logo = wrap.firstElementChild;
+  let x = Math.random() * 100, y = Math.random() * 200, vx = 2.2, vy = 1.8, hue = Math.floor(Math.random() * 360), raf = 0, corners = 0;
+  const step = () => {
+    const W = window.innerWidth - logo.offsetWidth, H = window.innerHeight - logo.offsetHeight;
+    x += vx; y += vy;
+    let hitX = false, hitY = false;
+    if (x <= 0 || x >= W) { vx = -vx; x = Math.max(0, Math.min(x, W)); hitX = true; }
+    if (y <= 0 || y >= H) { vy = -vy; y = Math.max(0, Math.min(y, H)); hitY = true; }
+    if (hitX || hitY) {
+      hue = (hue + 50 + Math.random() * 80) % 360;
+      logo.style.setProperty("--dvd-hue", hue + "deg");
+    }
+    // a corner: both walls within a few pixels of each other
+    if ((hitX && (y < 6 || y > H - 6)) || (hitY && (x < 6 || x > W - 6))) {
+      corners++;
+      logo.classList.remove("corner"); void logo.offsetWidth; logo.classList.add("corner");
+      haptic(60);
+      toast(L("eggCorner", { n: corners }), 1600);
+    }
+    logo.style.transform = `translate(${x}px, ${y}px)`;
+    raf = requestAnimationFrame(step);
+  };
+  logo.style.setProperty("--dvd-hue", hue + "deg");
+  raf = requestAnimationFrame(step);
+  const stop = () => {
+    cancelAnimationFrame(raf);
+    wrap.classList.add("out");
+    setTimeout(() => wrap.remove(), 300);
+    window.removeEventListener("hashchange", stop);
+  };
+  wrap.onclick = stop;
+  window.addEventListener("hashchange", stop);
+}
 
 // ---------- external links ----------
 function openExternal(url) {

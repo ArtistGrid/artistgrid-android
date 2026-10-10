@@ -554,6 +554,27 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
 .q-item.cur b { color: var(--fav); }
 .np-device, .pill { background: var(--pill-fill); border: 1px solid var(--pill-stroke); box-shadow: var(--pill-shadow); }
 
+/* ---------- Easter egg: bouncing "DVD" logo ---------- */
+#dvd { position: fixed; inset: 0; z-index: 45; background: rgba(0,0,0,.25); animation: fade-in .3s ease; cursor: pointer; }
+#dvd.out { opacity: 0; transition: opacity .3s; }
+.dvd-logo {
+  position: absolute; left: 0; top: 0; will-change: transform;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;
+}
+.dvd-logo .thumb {
+  width: 120px; height: 120px; border-radius: 50%; font-size: 44px;
+  border: 3px solid hsl(var(--dvd-hue) 90% 60%);
+  box-shadow: 0 0 28px hsl(var(--dvd-hue) 90% 55% / .7);
+  transition: border-color .2s, box-shadow .2s;
+}
+.dvd-logo .thumb img { filter: sepia(.35) hue-rotate(var(--dvd-hue)) saturate(1.4); }
+.dvd-logo span {
+  font-weight: 800; font-size: 15px; letter-spacing: .04em; text-transform: uppercase;
+  color: hsl(var(--dvd-hue) 90% 65%); text-shadow: 0 2px 8px rgba(0,0,0,.6); white-space: nowrap;
+}
+.dvd-logo.corner .thumb { animation: corner-pop .6s var(--spring); }
+@keyframes corner-pop { 30% { transform: scale(1.35) rotate(12deg); } }
+
 /* ---------- Toast ---------- */
 #toast {
   position: fixed; left: 50%; transform: translateX(-50%);
