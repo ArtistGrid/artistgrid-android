@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.5.6"; // web fallback; inside the app the APK's own version is used
+const APP_VERSION = "1.6.0"; // web fallback; inside the app the APK's own version is used
 const REPO = "ArtistGrid/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -128,6 +128,9 @@ const idb = (() => {
     // trackers only ("t:…" keys), not cached translations
     count: () => tx("readonly", (s) => s.getAllKeys()).then((k) => (k || []).filter((x) => String(x).startsWith("t:")).length).catch(() => 0),
     clear: () => tx("readwrite", (s) => s.clear()).catch(() => {}),
+    // keys / values whose key starts with a prefix ("t:", "ix:", …)
+    keys: (p) => tx("readonly", (s) => s.getAllKeys(IDBKeyRange.bound(p, p + "\uffff"))).catch(() => []),
+    values: (p) => tx("readonly", (s) => s.getAll(IDBKeyRange.bound(p, p + "\uffff"))).catch(() => []),
   };
 })();
 
@@ -362,6 +365,7 @@ $("#back").onclick = () => (history.length > 1 ? history.back() : (location.hash
 
 const ICONS = {
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  share: '<svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   filter: '<svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
@@ -412,11 +416,18 @@ async function renderHome(filter = "all") {
         <button id="theme-btn" class="icon-btn round" aria-label="${esc(L("themeToggle"))}">${THEME_ICONS[resolvedTheme()]}</button>
         <button id="gear" class="icon-btn round ${state.update ? "dot" : ""}" aria-label="${esc(L("settings"))}">${ICONS.gear}</button>
       </div>
-      ${searchBox("q", L("searchArtist"), state.query)}
+      ${searchBox("q", L("searchAll"), state.query)}
     </div>
-    <div class="grid" id="grid"></div>`;
+    <h3 class="g-h" id="g-artists-h" hidden>${esc(L("gArtists"))}</h3>
+    <div class="grid" id="grid"></div>
+    <div id="global"></div>`;
   const q = $("#q");
   q.oninput = () => { state.query = q.value; drawGrid(); };
+  $("#global").onclick = (e) => {
+    const era = e.target.closest(".g-era");
+    if (era) { haptic(); location.hash = era.dataset.href; return; }
+    trackListClick(e);
+  };
   $("#gear").onclick = () => (location.hash = "#/settings");
   $("#theme-btn").onclick = toggleTheme;
   $("#home-title").onclick = titleTapped;
@@ -441,6 +452,10 @@ function drawGrid() {
     return true;
   });
   $("#count").textContent = L("nArtists", { n: list.length });
+  // while searching, "no artists" isn't the end: the global results below may still have tracks
+  const searching = qn.length >= 2;
+  $("#g-artists-h").hidden = !searching || !list.length;
+  scheduleGlobal(list.length);
   $("#grid").innerHTML = list.length ? list.map((a) => `
     <button class="card" data-i="${a.idx}" style="${phStyle(a.name)}">
       <div class="ph">${initial(a.name)}</div>
@@ -452,7 +467,136 @@ function drawGrid() {
       </div>
       <div class="name">${esc(a.name)}</div>
     </button>`).join("")
-    : `<div class="state" style="grid-column:1/-1">${esc(state.filter === "fav" && !qn ? L("noFavs") : L("noResults"))}</div>`;
+    : searching ? "" : `<div class="state" style="grid-column:1/-1">${esc(state.filter === "fav" && !qn ? L("noFavs") : L("noResults"))}</div>`;
+}
+
+// ---------- global search ----------
+// Every tracker tab the app loads is indexed in IndexedDB (artist, era, track titles and links),
+// and the main tab of favourite artists is fetched quietly in the background, so the search on
+// the home finds tracks and eras across all those artists — instantly and offline. Downloading
+// all 580+ trackers (many MB each) isn't reasonable, so the note under the results says what is
+// covered.
+const gs = { records: null, tracks: [], eras: [], dirty: true, loading: null };
+const slimTrack = (t) => ({ name: t.name, links: t.links, available_length: t.available_length, quality: t.quality, track_length: t.track_length || t.length, type: t.type, leak_date: t.leak_date || t.release_date });
+async function indexTab(artist, url, tab, tabName, eras) {
+  if (!eras.some((e) => e.tracks.length)) return;
+  await idb.set(`ix:${url}:${tab}`, {
+    a: artist, url, tab, tabName, at: Date.now(),
+    eras: eras.map((e) => ({ n: e.name, c: e.cover_art || "", col: e.color || "", tr: e.tracks.map(slimTrack) })),
+  });
+  gs.dirty = true;
+}
+async function loadIndex() {
+  if (!gs.dirty && gs.records) return;
+  if (gs.loading) return gs.loading;
+  gs.loading = (async () => {
+    gs.dirty = false;
+    const recs = await idb.values("ix:");
+    const tracks = [], eras = [], seenT = new Set(), seenE = new Set();
+    // the main tab first, so duplicates found in "Best Of", "Recent"… point to the main one
+    recs.sort((x, y) => (x.tab ? 1 : 0) - (y.tab ? 1 : 0));
+    for (const r of recs) {
+      for (const er of r.eras || []) {
+        const e = { name: er.n, cover_art: er.c, color: er.col };
+        const ek = `${nameKey(r.a)}|${nameKey(er.n)}`;
+        if (er.n && !seenE.has(ek)) {
+          seenE.add(ek);
+          eras.push({ k: norm(er.n), artist: r.a, tab: r.tab, e, n: (er.tr || []).length });
+        }
+        for (const t of er.tr || []) {
+          const title = String(t.name?.title ?? t.name?.raw ?? t.name ?? "");
+          const raw = String(t.name?.raw || [title, ...(Array.isArray(t.name?.credits) ? t.name.credits : [])].join(" "));
+          const tk = `${nameKey(r.a)}|${nameKey(raw)}|${t.links?.[0]?.url || ""}`;
+          if (seenT.has(tk)) continue;
+          seenT.add(tk);
+          tracks.push({ k: norm(raw), item: { t, e, artist: r.a } });
+        }
+      }
+    }
+    gs.records = recs; gs.tracks = tracks; gs.eras = eras;
+  })().finally(() => (gs.loading = null));
+  return gs.loading;
+}
+function searchIndex(q) {
+  const words = q.split(/\s+/).filter(Boolean);
+  const hit = (k) => words.every((w) => k.includes(w));
+  // titles that start with the query first, then word starts, then anything containing it
+  const rank = (k) => (k.startsWith(q) ? 0 : (" " + k).includes(" " + words[0]) ? 1 : 2);
+  const tracks = gs.tracks.filter((x) => hit(x.k))
+    .map((x) => ({ x, r: rank(x.k) * 2 + (playableUrl(x.item.t) ? 0 : 1) }))
+    .sort((a, b) => a.r - b.r).map((y) => y.x.item);
+  const eras = gs.eras.filter((x) => hit(x.k)).sort((a, b) => rank(a.k) - rank(b.k)).slice(0, 30);
+  return { tracks, eras };
+}
+let globalT = 0, globalSeq = 0;
+function scheduleGlobal(artistCount) {
+  clearTimeout(globalT);
+  globalT = setTimeout(() => drawGlobal(artistCount), 160);
+}
+async function drawGlobal(artistCount) {
+  const g = $("#global"); if (!g) return;
+  const q = norm(state.query.trim());
+  if (q.length < 2) { g.innerHTML = ""; return; }
+  const seq = ++globalSeq;
+  if (!gs.records) g.innerHTML = `<div class="state"><div class="spinner"></div>${esc(L("gSearching"))}</div>`;
+  await loadIndex();
+  if (seq !== globalSeq || !$("#global")) return; // a newer search or another page
+  const { tracks, eras } = searchIndex(q);
+  const covered = gs.records.length ? new Set(gs.records.map((r) => r.a)).size : 0;
+  const note = `<p class="note g-note">${esc(covered ? L("gNote", { n: covered }) : L("gEmpty"))}</p>`;
+  if (!tracks.length && !eras.length) {
+    g.innerHTML = (artistCount ? "" : `<div class="state">${esc(L("noResults"))}</div>`) + note;
+    return;
+  }
+  g.innerHTML = `
+    ${eras.length ? `<h3 class="g-h">${esc(L("gEras"))}</h3>
+      <div class="g-eras">${eras.map((x) => `
+        <button class="g-era" data-href="#/a/${esc(encodeURIComponent(x.artist))}/${esc(encodeURIComponent(x.tab))}/${esc(encodeURIComponent(x.e.name))}">
+          <div class="thumb" style="${phStyle(x.e.name, x.e.color)}">${initial(x.e.name)}${imgTag(eraImgs(x.e, x.artist))}</div>
+          <b>${esc(x.e.name)}</b><span>${esc(x.artist)}</span>
+        </button>`).join("")}</div>` : ""}
+    ${tracks.length ? `<h3 class="g-h">${esc(L("gTracks"))} <span class="g-n">${tracks.length}</span></h3>
+      <div class="era open"><div class="era-body g-tracks" data-ready="1"></div></div>` : ""}
+    ${note}`;
+  if (tracks.length) appendTracks(g.querySelector(".g-tracks"), tracks, true);
+}
+// Background: index trackers saved before this version, then keep favourites' main tabs fresh.
+let warming = false;
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+async function warmSearchIndex() {
+  if (warming) return;
+  warming = true;
+  try {
+    await loadArtists().catch(() => {});
+    const byUrl = new Map(state.artists.map((a) => [a.url, a]));
+    const indexed = new Set(await idb.keys("ix:"));
+    for (const k of await idb.keys("t:")) {
+      const i = k.indexOf(":", 2), url = k.slice(2, i), tab = k.slice(i + 1), a = byUrl.get(url);
+      if (!a || indexed.has(`ix:${url}:${tab}`)) continue;
+      try {
+        const d = JSON.parse(await idb.get(k));
+        const tabName = (d.tabs || []).find((t) => t.slug === (d.tab?.slug || tab))?.name || d.tab?.name || "";
+        await indexTab(a.name, url, tab, tabName, normalizeEras(d, tabName));
+      } catch {}
+      await pause(200);
+    }
+    for (const name of favs) {
+      const a = state.artists.find((x) => x.name === name);
+      if (!a || !isSheetId(a.url) || !navigator.onLine) continue;
+      const rec = await idb.get(`ix:${a.url}:`);
+      if (rec && Date.now() - rec.at < 864e5) continue;
+      try {
+        const r = await cachedJson(TRACKER_API + `/sh/${a.url}/`, `t:${a.url}:`);
+        const d = r.data, tabName = (d.tabs || []).find((t) => t.slug === d.tab?.slug)?.name || d.tab?.name || "";
+        const eras = normalizeEras(d, tabName);
+        rememberEras(a.name, eras);
+        await indexTab(a.name, a.url, "", tabName, eras);
+      } catch {}
+      await pause(1500);
+    }
+  } finally {
+    warming = false;
+  }
 }
 
 // ---------- artist / tracker ----------
@@ -558,7 +702,7 @@ const FILTER_LABELS = { all: "fAll", play: "fPlay", full: "fFull", snippet: "fSn
 
 // The artist page keeps one sticky header (photo, name, favorite, search, filter, sections);
 // switching section only reloads what is below it.
-async function renderArtist(name, tabSlug) {
+async function renderArtist(name, tabSlug, eraName) {
   setChrome({ sub: true });
   try { await loadArtists(); } catch {}
   const a = state.artists.find((x) => x.name === name);
@@ -567,7 +711,7 @@ async function renderArtist(name, tabSlug) {
   }
   state.artistName = a.name;
   const pic = artistImgs(a.name);
-  const ui = { q: "", f: "all", tab: tabSlug || "" };
+  const ui = { q: "", f: "all", tab: tabSlug || "", openEra: eraName || "" };
 
   view.innerHTML = `
     <div class="backdrop" aria-hidden="true">${imgTag(pic, false)}</div>
@@ -578,6 +722,7 @@ async function renderArtist(name, tabSlug) {
           <h1>${esc(a.name)}</h1>
           <div class="sub" id="a-sub">${esc(L("loadingTracker"))}</div>
         </div>
+        <button id="a-share" class="icon-btn round" aria-label="${esc(L("share"))}">${ICONS.share}</button>
         <button id="fav-toggle" class="icon-btn round ${favs.has(a.name) ? "on" : ""}" aria-label="${esc(L("favorite"))}">${ICONS.heart}</button>
       </div>
       <div class="search-row">
@@ -591,10 +736,12 @@ async function renderArtist(name, tabSlug) {
     </div>
     <div id="a-body"><div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div></div>`;
 
+  $("#a-share").onclick = () => shareArtist(a);
   const fav = $("#fav-toggle");
   fav.onclick = () => {
     favs.has(a.name) ? favs.delete(a.name) : favs.add(a.name);
     saveFavs();
+    if (favs.has(a.name)) setTimeout(warmSearchIndex, 2000); // its main tab joins the global search
     fav.classList.toggle("on", favs.has(a.name));
     fav.classList.remove("pop"); void fav.offsetWidth; fav.classList.add("pop");
     haptic(12);
@@ -656,6 +803,7 @@ async function loadSection(a, ui) {
   const eras = normalizeEras(d, tabName);
   rememberEras(a.name, eras);
   fillEraCovers(a.name, eras);
+  indexTab(a.name, a.url, ui.tab, tabName, eras);
   // a side tab opened before the main one: load the main tab quietly to learn the era covers
   if (ui.tab && eras.some((e) => !e.cover_art) && !ui.mainLoaded) {
     ui.mainLoaded = true;
@@ -740,24 +888,42 @@ async function loadSection(a, ui) {
       haptic();
       return;
     }
-    const more = ev.target.closest(".more");
-    if (more) { more._next(); return; }
-    if (ev.target.closest("a")) return;
-    const tr = ev.target.closest(".track");
-    if (!tr) return;
-    // the info button (or a row that can't play) opens the details; anywhere else plays the track
-    if (ev.target.closest(".info") || !playableUrl(tr._item.t)) {
-      tr.classList.toggle("expanded");
-      if (tr.classList.contains("expanded") && tr._item.t.notes) autoTranslate(tr.querySelector(".notes"), tr._item.t.notes);
-      return;
-    }
-    haptic();
-    if (cur()?.t === tr._item.t) togglePlay();
-    else playItem(tr._item, tr.closest(".era-body, #list"));
+    trackListClick(ev);
   };
 
   ui.draw();
   enter(body);
+  // opened from the global search: unfold that era and bring it under the header
+  if (ui.openEra) {
+    const idx = eras.findIndex((e) => nameKey(e.name) === nameKey(ui.openEra));
+    ui.openEra = "";
+    const el = idx >= 0 && list.querySelector(`.era[data-e="${idx}"]`);
+    if (el) {
+      el.querySelector(".era-head").click();
+      requestAnimationFrame(() => window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - ($(".head")?.offsetHeight || 0) - 8 }));
+    }
+  }
+}
+
+// Taps on track rows, shared by artist pages and the global search: "show more", the details
+// button, sharing, and play/pause anywhere else on a playable row.
+function trackListClick(ev) {
+  const more = ev.target.closest(".more");
+  if (more) { more._next(); return; }
+  const tr = ev.target.closest(".track");
+  if (!tr) return;
+  const item = { ...tr._item, artist: tr._item.artist || state.artistName };
+  if (ev.target.closest(".share-track")) { shareTrack(item); return; }
+  if (ev.target.closest("a")) return;
+  // the info button (or a row that can't play) opens the details; anywhere else plays the track
+  if (ev.target.closest(".info") || !playableUrl(item.t)) {
+    tr.classList.toggle("expanded");
+    if (tr.classList.contains("expanded") && item.t.notes) autoTranslate(tr.querySelector(".notes"), item.t.notes);
+    return;
+  }
+  haptic();
+  if (cur()?.t === item.t) togglePlay();
+  else playItem(tr._item, tr.closest(".era-body, #list, .g-tracks"));
 }
 
 function eraHtml(e, artist) {
@@ -841,12 +1007,12 @@ function trackEl(item, showEra) {
       <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
     <div class="body">
-      ${showEra ? `<div class="era-tag">${esc(e.name)}</div>` : ""}
+      ${showEra ? `<div class="era-tag">${esc(item.artist ? item.artist + " · " + e.name : e.name)}</div>` : ""}
       <div class="tt">${esc(title)}</div>
       ${credits ? `<div class="cr">${esc(credits)}</div>` : ""}
       ${tags ? `<div class="meta">${tags}</div>` : ""}
       ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ""}
-      ${links ? `<div class="lnk">${links}</div>` : ""}
+      ${links ? `<div class="lnk">${links}<button class="share-track">${ICONS.share}<span>${esc(L("share"))}</span></button></div>` : ""}
     </div>
     ${t.notes || links || credits.length > 60 ? `<button class="info icon-btn" aria-label="${esc(L("details"))}"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>` : ""}`;
   return el;
@@ -927,6 +1093,24 @@ function autoTranslate(el, text) {
     span.textContent = res;
     btn.classList.remove("loading");
   }).catch(() => btn.remove());
+}
+
+// ---------- sharing ----------
+// Android's share sheet in the app; elsewhere the Web Share API, or the clipboard as a last resort.
+async function shareText(title, text) {
+  haptic();
+  if (NATIVE_API && (await native("share", { title, text }))) return;
+  if (navigator.share) { try { await navigator.share({ title, text }); return; } catch (e) { if (e?.name === "AbortError") return; } }
+  try { await navigator.clipboard.writeText(text); toast(L("shareCopied")); }
+  catch { toast(L("shareFailed")); }
+}
+function shareTrack(it) {
+  const link = (it.t.links || []).map((l) => l.url).find((u) => audioUrl(u)) || it.t.links?.[0]?.url || "";
+  const title = trackTitle(it.t);
+  shareText(title, [`${title}`, `${it.artist} · ${it.e.name}`, link, "", L("shareFrom")].filter((x, i) => x || i === 3).join("\n"));
+}
+function shareArtist(a) {
+  shareText(a.name, [L("shareArtistText", { a: a.name }), `https://docs.google.com/spreadsheets/d/${a.url}`, "", L("shareFrom")].join("\n"));
 }
 
 // ---------- native bridge (Android only) ----------
@@ -1017,6 +1201,7 @@ function applyTheme(animate = false) {
   }
   root.dataset.theme = t;
   const v = applyAccent(t);
+  if (document.getElementById("np")?.classList.contains("open")) tintFromCover(); // tint follows light/dark
   const bg = settings.uiStyle === "material" ? v["--md-surface"] : t === "light" ? "#f2f2f7" : "#000000";
   $('meta[name="theme-color"]').setAttribute("content", bg);
   native("setBars", { dark: t === "dark", color: bg });
@@ -1117,7 +1302,8 @@ function fitMarquee(el) {
 const marqueeRO = new ResizeObserver((entries) => entries.forEach((e) => fitMarquee(e.target)));
 
 function playItem(item, container) {
-  const items = (container?._items || [item]).filter((x) => playableUrl(x.t)).map((x) => ({ ...x, artist: state.artistName }));
+  // results of the global search carry their own artist
+  const items = (container?._items || [item]).filter((x) => playableUrl(x.t)).map((x) => ({ ...x, artist: x.artist || state.artistName }));
   state.queue = items;
   state.history = [];
   state.qIndex = Math.max(0, items.findIndex((x) => x.t === item.t));
@@ -1281,7 +1467,7 @@ for (const el of [audioFx, audioRaw]) {
     if (el !== audio) return;
     bar.style.transform = `scaleX(${el.duration ? el.currentTime / el.duration : 0})`;
     if (Date.now() - sessionSaved > 10000) saveSession();
-    if (npIsOpen()) updateSeek();
+    if (npIsOpen()) { updateSeek(); updateLyrics(); }
   };
   el.onplay = () => {
     if (el !== audio) return;
@@ -1298,9 +1484,11 @@ for (const el of [audioFx, audioRaw]) {
   };
   el.onloadedmetadata = el.onseeked = el.onratechange = (ev) => {
     if (el !== audio) return;
+    // the real duration is known now: it decides between synced and plain lyrics
+    if (ev.type === "loadedmetadata" && ly.res && ly.it === cur() && ly.res.synced) renderLyrics(ly.it);
     if (ev.type === "loadedmetadata" && pendingSeek) { el.currentTime = Math.min(pendingSeek, (el.duration || pendingSeek) - 1); pendingSeek = 0; }
     syncNative();
-    if (npIsOpen()) updateSeek();
+    if (npIsOpen()) { updateSeek(); updateLyrics(ev.type === "seeked"); }
   };
   el.onended = () => { if (el === audio && settings.autoplay) nextTrack(true); };
   el.onerror = () => {
@@ -1370,6 +1558,7 @@ function closeNowPlaying() {
   });
 }
 function hideNowPlaying() {
+  closeLyrics();
   np.classList.remove("open", "dragging");
   np.style.transform = "";
   np.setAttribute("aria-hidden", "true");
@@ -1384,6 +1573,7 @@ function renderNowPlaying() {
   $("#np-era").textContent = it.e.name;
   $("#np-thumb").setAttribute("style", phStyle(it.e.name, it.e.color));
   $("#np-thumb").dataset.initial = (String(it.e.name).trim()[0] || "♪").toUpperCase();
+  if (tintFor !== it) { tintFor = it; setTint(eraTint(it.e)); }
   setImg($("#np-cover"), coverList(it));
   setImg($("#np-bg-img"), coverList(it));
   $("#np-fav").classList.toggle("on", favs.has(it.artist));
@@ -1394,7 +1584,181 @@ function renderNowPlaying() {
   $("#np-speed").textContent = settings.speed + "×";
   updateSeek();
   renderQueue();
+  loadLyrics(it);
 }
+// ---------- dynamic colour from the cover ----------
+// Like Spotify, the full-screen player (and its lyrics card) takes its colour from the album
+// cover: a 24×24 sample, ignoring near-black/white pixels and favouring saturated ones, then
+// clamped to a lightness that keeps white (dark theme) or black (light theme) text readable.
+function rgbToHsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min, s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+const hsl = (h, s, l) => `hsl(${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
+function coverColor(img) {
+  const c = (coverColor.canvas ||= Object.assign(document.createElement("canvas"), { width: 24, height: 24 }));
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  let data;
+  try { ctx.clearRect(0, 0, 24, 24); ctx.drawImage(img, 0, 0, 24, 24); data = ctx.getImageData(0, 0, 24, 24).data; }
+  catch { return null; } // an image from another origin can't be read
+  let r = 0, g = 0, b = 0, w = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue;
+    const [, s, l] = rgbToHsl([data[i], data[i + 1], data[i + 2]]);
+    if (l < 0.08 || l > 0.94) continue;
+    const wt = 0.1 + s * s;
+    r += data[i] * wt; g += data[i + 1] * wt; b += data[i + 2] * wt; w += wt;
+  }
+  return w ? rgbToHsl([r / w, g / w, b / w]) : null;
+}
+function setTint(h) {
+  // h = [hue, saturation, lightness] or null for the neutral look
+  const dark = resolvedTheme() === "dark";
+  if (!h) { np.style.removeProperty("--np-tint"); np.style.removeProperty("--np-card"); return; }
+  const s = Math.min(h[1], dark ? 0.55 : 0.5);
+  np.style.setProperty("--np-tint", hsl(h[0], s, dark ? 0.28 : 0.86));
+  np.style.setProperty("--np-card", hsl(h[0], Math.min(s, 0.5), dark ? 0.34 : 0.8));
+}
+let tintFor = null;
+function tintFromCover() {
+  const img = $("#np-cover"), it = cur();
+  if (!it || tintFor !== it) return;
+  setTint(coverColor(img) || eraTint(it.e));
+}
+// before (or without) a readable cover: the era's own colour from the tracker, if it has one
+function eraTint(e) {
+  const m = /^#([0-9a-f]{6})$/i.exec(e?.color || "");
+  return m ? rgbToHsl(hexRgb("#" + m[1])) : null;
+}
+$("#np-cover").addEventListener("load", tintFromCover);
+
+// ---------- lyrics ----------
+// Looked up on LRCLIB (free, open lyrics database) by title and artist. Leaks often differ from
+// the released version, so time-synced lyrics are used only when the durations match within a
+// few seconds; otherwise the plain text is shown. Answers, "not found" included, are cached.
+const ly = { it: null, res: null, lines: null, synced: false, cur: -1, userScrollAt: 0 };
+const lyEl = $("#np-lyrics"), lyBody = $("#ly-body");
+function lyricsQuery(it) {
+  let title = String(it.t.name?.title || it.t.name?.raw || it.t.name || "")
+    .replace(/\[[^\]]*\]|\([^)]*\)|\{[^}]*\}/g, " ")          // [V3], (feat. …), {…}
+    .replace(/\p{Extended_Pictographic}|[★☆✦✧]/gu, " ")         // ⭐ 🏆 …
+    .split(/\s+\/\s+/)[0]                                          // "Space X / Alien" → "Space X"
+    .replace(/[?*]+$/g, "").replace(/\s+/g, " ").trim();
+  const artist = String(it.artist || "").replace(/\(.*?\)/g, "").trim();
+  return { title, artist };
+}
+const parseDur = (s) => { const m = /^(\d+):(\d{2})$/.exec(String(s || "").trim()); return m ? +m[1] * 60 + +m[2] : 0; };
+async function findLyrics(it) {
+  const { title, artist } = lyricsQuery(it);
+  if (!nameKey(title)) return null;
+  const key = `ly:${nameKey(artist)}:${nameKey(title)}`;
+  const saved = await idb.get(key);
+  if (saved && !(saved.none && Date.now() - saved.at > 3 * 864e5)) return saved.none ? null : saved;
+  let list = await getJson(`https://lrclib.net/api/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`);
+  if (!Array.isArray(list) || !list.length) list = await getJson(`https://lrclib.net/api/search?q=${encodeURIComponent(artist + " " + title)}`);
+  const hits = (Array.isArray(list) ? list : []).filter((x) => sameArtist(x.artistName || "", artist) && sameTitle(x.trackName || "", title) && (x.plainLyrics || x.syncedLyrics));
+  // prefer synced lyrics, then the closest duration
+  const want = parseDur(it.t.track_length || it.t.length);
+  hits.sort((a, b) => (!!b.syncedLyrics - !!a.syncedLyrics) || (want ? Math.abs(a.duration - want) - Math.abs(b.duration - want) : 0));
+  const h = hits[0];
+  const res = h ? { plain: h.plainLyrics || "", synced: h.syncedLyrics || "", duration: h.duration || 0, instrumental: !!h.instrumental } : null;
+  idb.set(key, res || { none: true, at: Date.now() });
+  return res;
+}
+function parseLrc(text) {
+  const out = [];
+  for (const line of String(text).split("\n")) {
+    const stamps = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if (!stamps.length) continue;
+    const words = line.replace(/\[[^\]]*\]/g, "").trim();
+    for (const s of stamps) out.push({ t: +s[1] * 60 + +s[2], text: words });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+function showLyricsState(msg, cls = "") {
+  lyBody.innerHTML = `<div class="ly-state ${cls}">${msg}</div>`;
+  $("#ly-src").textContent = "";
+  ly.lines = null;
+}
+async function loadLyrics(it) {
+  if (ly.it === it) return;
+  ly.it = it; ly.cur = -1; ly.res = null;
+  lyEl.hidden = false;
+  lyEl.classList.remove("synced");
+  showLyricsState(`<div class="spinner small"></div>${esc(L("lyricsLoading"))}`, "loading");
+  let res = null;
+  try { res = await findLyrics(it); } catch { res = undefined; }
+  if (ly.it !== it) return; // the track changed meanwhile
+  if (res === undefined) return showLyricsState(esc(L("lyricsError")));
+  if (!res || res.instrumental) return showLyricsState(esc(L(res?.instrumental ? "lyricsInstrumental" : "lyricsNone")));
+  ly.res = res;
+  renderLyrics(it);
+}
+function renderLyrics(it) {
+  const res = ly.res;
+  // synced only when this file is the same version as the one on LRCLIB
+  const dur = isFinite(audio.duration) && audio.duration ? audio.duration : parseDur(it.t.track_length || it.t.length);
+  const synced = res.synced && (!dur || !res.duration || Math.abs(dur - res.duration) <= 4) ? parseLrc(res.synced) : null;
+  ly.synced = !!(synced && synced.length);
+  ly.lines = ly.synced ? synced : res.plain.split("\n").map((text) => ({ t: null, text: text.trim() }));
+  lyEl.classList.toggle("synced", ly.synced);
+  lyBody.innerHTML = ly.lines.map((l, i) => `<p data-i="${i}" class="${l.text ? "" : "gap"}">${esc(l.text || (ly.synced ? "♪" : ""))}</p>`).join("");
+  lyBody.scrollTop = 0;
+  $("#ly-src").textContent = L("lyricsSource");
+  updateLyrics(true);
+}
+function updateLyrics(force = false) {
+  if (!ly.synced || !ly.lines || !npIsOpen()) return;
+  const t = (audio.currentTime || 0) + 0.25;
+  let i = -1;
+  for (let k = 0; k < ly.lines.length && ly.lines[k].t <= t; k++) i = k;
+  if (i === ly.cur && !force) return;
+  ly.cur = i;
+  lyBody.querySelectorAll("p").forEach((p, k) => { p.classList.toggle("on", k === i); p.classList.toggle("past", k < i); });
+  // keep the current line about a third from the top, unless the user is scrolling the lyrics
+  const line = lyBody.children[Math.max(i, 0)];
+  if (line && Date.now() - ly.userScrollAt > 3500) {
+    lyBody.scrollTo({ top: line.offsetTop - lyBody.clientHeight * 0.32, behavior: settings.reduceMotion || force ? "auto" : "smooth" });
+  }
+}
+lyBody.addEventListener("touchstart", () => (ly.userScrollAt = Date.now()), { passive: true });
+lyBody.addEventListener("wheel", () => (ly.userScrollAt = Date.now()), { passive: true });
+lyBody.onclick = (e) => {
+  const p = e.target.closest("p[data-i]");
+  if (p && ly.synced) {
+    // tap a line to jump there
+    audio.currentTime = ly.lines[+p.dataset.i].t;
+    ly.userScrollAt = 0;
+    if (audio.paused) togglePlay();
+    return;
+  }
+  if (!lyEl.classList.contains("full")) openLyrics();
+};
+// full-screen lyrics, closed by the button or Back
+function openLyrics() {
+  if (lyEl.classList.contains("full") || !ly.lines) return;
+  lyEl.classList.add("full");
+  document.body.classList.add("ly-open");
+  history.pushState({ np: 1, ly: 1 }, "", location.href);
+  updateLyrics(true);
+}
+function closeLyrics() {
+  if (!lyEl.classList.contains("full")) return;
+  lyEl.classList.remove("full");
+  document.body.classList.remove("ly-open");
+  updateLyrics(true);
+}
+$("#ly-toggle").onclick = (e) => {
+  e.stopPropagation();
+  if (lyEl.classList.contains("full")) history.state?.ly ? history.back() : closeLyrics();
+  else openLyrics();
+};
+window.addEventListener("popstate", () => { if (!history.state?.ly) closeLyrics(); });
+
 function updateSeek() {
   if (npSeeking) return;
   const d = audio.duration, c = audio.currentTime || 0;
@@ -1440,6 +1804,7 @@ $("#np-speed").onclick = () => {
   audio.playbackRate = settings.speed;
   $("#np-speed").textContent = settings.speed + "×";
 };
+$("#np-share").onclick = () => { const it = cur(); if (it) shareTrack(it); };
 $("#np-fav").onclick = () => {
   const it = cur(); if (!it) return;
   favs.has(it.artist) ? favs.delete(it.artist) : favs.add(it.artist);
@@ -1704,7 +2069,7 @@ async function renderSettings() {
 
   const showCache = async () => { $("#s-cache").textContent = L("cacheInfo", { n: await idb.count() }); };
   showCache();
-  $("#s-clear").onclick = async () => { await idb.clear(); showCache(); toast(L("cacheCleared")); };
+  $("#s-clear").onclick = async () => { await idb.clear(); gs.dirty = true; showCache(); toast(L("cacheCleared")); };
 
   const upd = $("#s-upd"), status = $("#s-upd-status");
   upd.onclick = async () => {
@@ -1825,7 +2190,7 @@ function route() {
   state.artistName = "";
   // lets the layout adapt per page (e.g. narrower settings on tablets)
   view.dataset.page = parts[0] === "a" && parts[1] ? "artist" : parts[0] === "settings" ? "settings" : "home";
-  if (parts[0] === "a" && parts[1]) renderArtist(parts[1], parts[2]);
+  if (parts[0] === "a" && parts[1]) renderArtist(parts[1], parts[2], parts[3]);
   else if (parts[0] === "settings") renderSettings();
   else renderHome(FILTER_ROUTES[parts[0]] ? parts[0] : "all");
 }
@@ -1839,3 +2204,4 @@ installedVersion();
 window.addEventListener("hashchange", route);
 route();
 setTimeout(autoCheckUpdates, 1500);
+setTimeout(warmSearchIndex, 5000);

@@ -330,6 +330,27 @@ public class NativePlugin extends Plugin {
                 .addOnFailureListener(e -> call.reject(String.valueOf(e.getMessage())));
     }
 
+    /** Opens Android's share sheet with a text (title, artist, link). */
+    @PluginMethod
+    public void share(PluginCall call) {
+        String text = call.getString("text");
+        if (text == null || text.isEmpty()) { call.reject("Nothing to share"); return; }
+        Intent send = new Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, text)
+                .putExtra(Intent.EXTRA_TITLE, call.getString("title", ""));
+        Intent chooser = Intent.createChooser(send, call.getString("title", null));
+        try {
+            if (getActivity() != null) getActivity().startActivity(chooser);
+            else getContext().startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            JSObject ret = new JSObject();
+            ret.put("shared", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(String.valueOf(e.getMessage()));
+        }
+    }
+
     /** Light or dark system bar icons (and bar colour on Android versions that still colour them). */
     @PluginMethod
     public void setBars(PluginCall call) {

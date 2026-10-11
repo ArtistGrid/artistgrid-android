@@ -79,6 +79,7 @@
           <h2 id="np-title" class="marquee"></h2>
           <button class="artist" id="np-artist"></button>
         </div>
+        <button id="np-share" class="icon-btn" data-i18n-aria="share"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button>
         <button id="np-fav" class="icon-btn" data-i18n-aria="favorite"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9.2-8.7A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.2 4.9C19 15.5 12 20 12 20z"/></svg></button>
       </div>
       <div class="np-seek">
@@ -97,6 +98,14 @@
         <button id="np-speed" class="chip">1×</button>
         <button id="np-eq" class="icon-btn round" data-i18n-aria="eq"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
       </div>
+      <section class="np-lyrics" id="np-lyrics" hidden>
+        <header class="ly-head">
+          <h3 data-i18n="lyrics"></h3>
+          <button id="ly-toggle" class="icon-btn" data-i18n-aria="lyricsExpand"><svg viewBox="0 0 24 24" class="ly-open-i"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg><svg viewBox="0 0 24 24" class="ly-close-i"><path d="M6 9l6 6 6-6"/></svg></button>
+        </header>
+        <div class="ly-body" id="ly-body"></div>
+        <div class="ly-src" id="ly-src"></div>
+      </section>
       <div class="np-queue">
         <h3 data-i18n="upNext"></h3>
         <div class="rows" id="np-queue"></div>

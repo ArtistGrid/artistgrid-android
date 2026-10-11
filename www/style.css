@@ -352,6 +352,21 @@ body.is-playing .track .play.on .bars i { animation: bar 1s ease-in-out infinite
 .tr-btn.loading { color: var(--muted); animation: tr-pulse 1s ease-in-out infinite; }
 @keyframes tr-pulse { 50% { opacity: .3; } }
 svg.fill { fill: currentColor; stroke: none; }
+/* global search results on the home */
+.g-h { margin: 18px 4px 10px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+#g-artists-h { margin-top: 8px; }
+.g-n { font-weight: 500; margin-left: 4px; }
+.g-eras { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 6px; margin: 0 -2px; }
+.g-eras::-webkit-scrollbar { display: none; }
+.g-era { flex: 0 0 auto; width: 118px; text-align: left; padding: 0; transition: transform .3s var(--spring); }
+.g-era:active { transform: scale(.95); }
+.g-era .thumb { width: 118px; height: 118px; border-radius: var(--r-md); font-size: 36px; margin-bottom: 7px; }
+.g-era b, .g-era span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-era b { font-size: 13.5px; }
+.g-era span { font-size: 12px; color: var(--muted); }
+.g-note { padding: 12px 4px 0; text-align: center; }
+.lnk .share-track { display: inline-flex; align-items: center; gap: 5px; padding: 0; font-size: 12px; font-weight: 600; color: var(--accent); }
+.lnk .share-track svg { width: 14px; height: 14px; }
 .era-tag { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 
 .state { text-align: center; color: var(--muted); padding: 50px 20px; }
@@ -517,7 +532,7 @@ body.in-sub #lens.ready { opacity: .45; }
 }
 .np.open { transform: none; visibility: visible; transition: transform .5s var(--ease-out), visibility 0s; }
 .np.dragging { transition: none; }
-.np-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: var(--np-tint, transparent); }
+.np-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: var(--np-tint, transparent); transition: background-color .6s ease; }
 .np-bg img {
   position: absolute; inset: -60px; width: calc(100% + 120px); height: calc(100% + 120px); object-fit: cover;
   filter: blur(60px) saturate(1.6); opacity: 0; transform: translateZ(0); transition: opacity .6s ease;
@@ -570,6 +585,47 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
 .np-device span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
 .np-device.bt { color: var(--ok); }
 .np-extra .chip { padding: 9px 14px; }
+/* lyrics card, tinted with the cover colour like the rest of the player */
+.np-lyrics {
+  position: relative; margin: 0 0 22px; padding: 14px 16px 12px; border-radius: var(--r-lg);
+  background: var(--np-card, var(--surface-2)); transition: background-color .6s ease;
+  display: flex; flex-direction: column;
+}
+.ly-head { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 4px 0; }
+.ly-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.ly-head .icon-btn { width: 36px; height: 36px; }
+.ly-head .icon-btn svg { width: 18px; height: 18px; }
+.ly-body {
+  max-height: 290px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; cursor: pointer;
+  -webkit-mask-image: linear-gradient(transparent, #000 18px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(transparent, #000 18px, #000 calc(100% - 28px), transparent);
+  padding: 10px 0 24px;
+}
+.ly-body::-webkit-scrollbar { display: none; }
+.ly-body p { margin: 0 0 10px; font-size: 19px; font-weight: 700; line-height: 1.3; word-break: break-word; transition: color .3s ease, opacity .3s ease; }
+.ly-body p.gap { margin-bottom: 4px; min-height: .6em; }
+/* synced: upcoming lines dim, the current one bright; tap a line to jump there */
+.synced .ly-body p { color: rgba(var(--ink), .38); }
+.synced .ly-body p.past { color: rgba(var(--ink), .7); }
+.synced .ly-body p.on { color: var(--text); }
+.ly-state { color: var(--muted); font-size: 14px; padding: 6px 0 2px; display: flex; align-items: center; gap: 10px; cursor: default; }
+.spinner.small { width: 16px; height: 16px; border-width: 2px; margin: 0; }
+.ly-src { color: var(--muted); font-size: 11px; }
+.ly-src:empty { display: none; }
+/* full screen */
+.np-lyrics.full {
+  position: fixed; inset: 0; z-index: 5; margin: 0; border-radius: 0;
+  padding: calc(10px + var(--safe-top)) 24px calc(16px + var(--safe-bottom));
+  background: var(--np-card, var(--bg));
+  animation: ly-in .35s var(--ease-out);
+}
+@keyframes ly-in { from { opacity: 0; transform: translateY(24px); } }
+.np-lyrics.full .ly-body { max-height: none; flex: 1; padding: 30vh 0 40vh; }
+.np-lyrics.full .ly-body p { font-size: 26px; margin-bottom: 14px; }
+.np-lyrics.full .ly-head { max-width: 760px; width: 100%; margin: 0 auto 4px; }
+.np-lyrics.full .ly-body, .np-lyrics.full .ly-src { max-width: 760px; width: 100%; margin: 0 auto; }
+.ly-close-i, .np-lyrics.full .ly-open-i { display: none; }
+.np-lyrics.full .ly-close-i { display: block; }
 .np-queue h3 { margin: 0 2px 8px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .np-queue .rows { background: var(--surface); }
 .q-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
@@ -613,8 +669,8 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
   .np-scroll {
     max-width: 1180px; display: grid; column-gap: 56px; align-content: start;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "top top" "cover meta" "cover seek" "cover controls" "cover extra" "cover queue";
-    grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-areas: "top top" "cover meta" "cover seek" "cover controls" "cover extra" "cover lyrics" "cover queue";
+    grid-template-rows: auto auto auto auto auto auto 1fr;
   }
   .np-top { grid-area: top; }
   .np-cover { grid-area: cover; align-self: start; position: sticky; top: 0; width: min(100%, calc(100vh - 140px)); margin: 8px auto 0; }
@@ -622,6 +678,7 @@ body:not(.is-playing) .np-cover { transform: scale(.88); }
   .np-seek { grid-area: seek; }
   .np-controls { grid-area: controls; }
   .np-extra { grid-area: extra; }
+  .np-lyrics { grid-area: lyrics; }
   .np-queue { grid-area: queue; }
 }
 
