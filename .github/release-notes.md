@@ -1,10 +1,12 @@
-Lyrics, dynamic colors, sharing and search across trackers.
+Visual refresh, trackers beyond Google Sheets, and a first iOS build.
 
 ### What's new
-- **Lyrics**: the full-screen player shows the lyrics of the current track, from LRCLIB. When the leak matches the version on LRCLIB, the lyrics are synced and follow the song: the current line lights up, and you can tap a line to jump there. Otherwise you get the plain text. Tap the card or the expand icon for full-screen lyrics, and press Back to close them.
-- **Dynamic colors**: the full-screen player and the lyrics card take their color from the album cover, in both the dark and light themes.
-- **Sharing**: share a track from the player or from its details, or an artist's tracker from their page, through Android's share menu. Tracks are shared with title, artist, era and link.
-- **Global search**: the search on the home now finds tracks and eras too, not just artists. It covers the trackers saved on your phone: every tracker you open, and your favorite artists' trackers, which are downloaded in the background. Works offline. Tap a track to play it, or an era to open it.
+- **Fluid visualizer**: the full-screen player has an animated background (Kawarp) that flows with the album cover's colors.
+- **Era styling**: eras can use their own font and a subtle color tint on their cards.
+- **More trackers**: artists whose tracker isn't a Google Sheet now link to and share their own site.
+- **Placeholders**: artists and tracks without a cover get a clean solid color instead of a gradient.
+- **iOS**: an unsigned **ArtistGrid.ipa** is now attached to each release (sideload only).
+- **Fix**: the version shown in Settings now always matches the installed app, so the update check no longer offers the version you already have.
 
 ### Installation
 Update from **Settings → Updates** in the app, or download **ArtistGrid.apk** below. Installs over the previous version and keeps your favorites. Requires Android 6.0+.
