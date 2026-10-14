@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 // The release workflow passes the version typed in "Run workflow" as APP_VERSION, so the APK
 // always reports the same version as its GitHub release (and the in-app update check agrees).
 // Local and push builds use the version below. versionCode follows from it: 1.5.1 → 10501.
-def appVersion = System.getenv('APP_VERSION') ?: "1.6.0"
+def appVersion = System.getenv('APP_VERSION') ?: "1.6.2"
 def appVersionCode = { String v ->
     def p = (v.tokenize('.') + ['0', '0'])[0..2].collect { (it.replaceAll('[^0-9]', '') ?: '0') as int }
     p[0] * 10000 + p[1] * 100 + p[2]

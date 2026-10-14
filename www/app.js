@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_VERSION = "1.6.0"; // web fallback; inside the app the APK's own version is used
+const APP_VERSION = "1.6.2"; // web fallback; inside the app the APK's own version is used
 const REPO = "ArtistGrid/artistgrid-android";
 const ARTISTS_CSV = "https://artists.artistgrid.cx/artists.csv";
 const TRACKER_API = "https://trackerapi.artistgrid.cx";
@@ -2253,7 +2253,7 @@ async function renderSettings() {
       <h3>${esc(L("updates"))}</h3>
       <div class="rows">
         <div class="row">
-          <span class="lbl">${esc(L("version", { v: state.version || APP_VERSION }))}<small id="s-upd-status">${state.update ? esc(L("updateAvailable", { v: state.update.version })) : ""}</small></span>
+          <span class="lbl"><span id="s-ver">${esc(L("version", { v: state.version || APP_VERSION }))}</span><small id="s-upd-status">${state.update ? esc(L("updateAvailable", { v: state.update.version })) : ""}</small></span>
           <button class="btn ${state.update ? "" : "ghost"}" id="s-upd">${esc(state.update ? L("download") : L("checkUpdates"))}</button>
         </div>
         <label class="row"><span class="lbl">${esc(L("autoUpdates"))}</span>${sw("s-autoupd", settings.autoUpdate)}</label>
@@ -2326,6 +2326,9 @@ async function renderSettings() {
   showCache();
   $("#s-clear").onclick = async () => { await idb.clear(); gs.dirty = true; showCache(); toast(L("cacheCleared")); };
 
+  // settings can open before the APK's version has been read: fill it in once it arrives
+  installedVersion().then((v) => { const e = $("#s-ver"); if (e) e.textContent = L("version", { v }); });
+
   const upd = $("#s-upd"), status = $("#s-upd-status");
   upd.onclick = async () => {
     if (state.update) return downloadUpdate(upd, status);
@@ -2343,8 +2346,9 @@ async function renderSettings() {
 }
 // the version really installed (from the APK), so the update check can't disagree with it
 async function installedVersion() {
-  if (!state.version) state.version = (await native("getAppInfo"))?.version || APP_VERSION;
-  return state.version;
+  // a failed read isn't cached, so the fallback can't stick for the whole session
+  if (!state.version) state.version = (await native("getAppInfo"))?.version || "";
+  return state.version || APP_VERSION;
 }
 onNative("updateProgress", (d) => {
   const st = $("#s-upd-status");
