@@ -62,6 +62,24 @@ const saveSettings = () => store("settings", settings);
 function applyLook() {
   document.body.classList.toggle("compact", settings.compact);
   document.body.classList.toggle("reduce-motion", settings.reduceMotion);
+  if (visualizer) {
+    if (settings.reduceMotion) {
+      visualizer.stop();
+      $("#np-visualizer")?.classList.remove("active");
+    } else if (!audio.paused && npIsOpen()) {
+      $("#np-visualizer")?.classList.add("active");
+      visualizer.start();
+    }
+  }
+  if (artistVisualizer) {
+    if (settings.reduceMotion) {
+      artistVisualizer.stop();
+      $("#artist-visualizer")?.classList.remove("active");
+    } else {
+      $("#artist-visualizer")?.classList.add("active");
+      artistVisualizer.start();
+    }
+  }
 }
 
 // ---------- i18n (device language unless overridden in Settings) ----------
@@ -86,6 +104,14 @@ function L(key, vars = {}) {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const isSheetId = (u) => /^[A-Za-z0-9_-]{25,}$/.test(u);
+const trackerDomain = (u) => String(u ?? "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+const isDomainTracker = (u) => /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(trackerDomain(u));
+const isSupportedTracker = (u) => isSheetId(u) || isDomainTracker(u);
+const trackerKey = (u) => isSheetId(u) ? u : trackerDomain(u);
+const trackerExternalUrl = (u, gid) => isSheetId(u)
+  ? `https://docs.google.com/spreadsheets/d/${esc(u)}/edit${gid != null ? "#gid=" + esc(gid) : ""}`
+  : `https://${esc(trackerDomain(u))}`;
+const trackerExternalLabel = (u) => isSheetId(u) ? "Google Sheet ↗" : `${esc(trackerDomain(u))} ↗`;
 
 function toast(msg, ms = 2200) {
   const t = $("#toast");
@@ -189,12 +215,13 @@ function imgTag(urls, lazy = true) {
   const list = candidates(urls);
   if (!list.length) return "";
   const first = list[0].startsWith("lookup:") ? EMPTY_SRC : list.shift();
-  return `<img ${lazy ? 'loading="lazy"' : ""} decoding="async" referrerpolicy="no-referrer" alt="" src="${esc(first)}" data-next="${esc(list.map(encodeURIComponent).join(" "))}" />`;
+  return `<img ${lazy ? 'loading="lazy"' : ""} decoding="async" referrerpolicy="no-referrer" crossorigin="anonymous" alt="" src="${esc(first)}" data-next="${esc(list.map(encodeURIComponent).join(" "))}" />`;
 }
 function setImg(img, urls) {
   const list = candidates(urls);
   img._gen = (img._gen || 0) + 1; // invalidates cover lookups still running for the previous image
   img.classList.remove("loaded", "failed");
+  img.crossOrigin = "anonymous";
   img.dataset.next = list.slice(1).map(encodeURIComponent).join(" ");
   if (!list.length) { img.removeAttribute("src"); img.classList.add("failed"); }
   else if (list[0].startsWith("lookup:")) { img.dataset.next = list.map(encodeURIComponent).join(" "); img.src = EMPTY_SRC; }
@@ -205,13 +232,14 @@ function advanceImg(img) {
   if (!next) { img.classList.add("failed"); return; }
   img.dataset.next = rest.join(" ");
   const src = decodeURIComponent(next);
-  if (!src.startsWith("lookup:")) { img.src = src; return; }
+  if (!src.startsWith("lookup:")) { img.crossOrigin = "anonymous"; img.src = src; return; }
   const [, kind, artist, title] = src.split(":");
   const gen = img._gen;
   lookupCover(kind, decodeURIComponent(artist), decodeURIComponent(title)).then((url) => {
     if (img._gen !== gen) return; // the element shows another track by now (player covers are reused)
     if (!url) return advanceImg(img);
     img.dataset.next = [...(NATIVE ? [url] : []).map(encodeURIComponent), ...rest].join(" ");
+    img.crossOrigin = "anonymous";
     img.src = NATIVE ? cachedImg(url) : url;
   });
 }
@@ -232,7 +260,14 @@ function artistImgs(name) {
     lookupToken("artist", name),
   ];
 }
-const eraImgs = (era, artist) => [era.cover_art, lookupToken("album", artist, era.name)];
+const eraImgs = (era, artist) => [
+  era?.cover_art,
+  era?.era_logo,
+  era?.image,
+  era?.header_image,
+  era?.logo,
+  lookupToken("album", artist, era?.name),
+].filter(Boolean);
 
 // ---------- cover lookup (Apple Music / Deezer) ----------
 // Only results whose artist name matches are accepted, so a missing cover never turns into a
@@ -297,11 +332,11 @@ function lookupCover(kind, artist, title) {
   return p;
 }
 
-// Stable gradient per name, so missing covers still look intentional.
+// Stable solid colour per name/color for missing covers and artist placeholders
 function phStyle(seed, color) {
-  if (color && /^#[0-9a-f]{3,8}$/i.test(color)) return `--ph:linear-gradient(135deg, ${color}, #111)`;
+  if (color && /^#[0-9a-f]{3,8}$/i.test(color)) return `--ph:${color}`;
   let h = 0; for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return `--ph:linear-gradient(135deg, hsl(${h} 45% 28%), hsl(${(h + 40) % 360} 35% 12%))`;
+  return `--ph:hsl(${h} 36% 22%)`;
 }
 const initial = (s) => esc((String(s).trim()[0] || "?").toUpperCase());
 
@@ -434,7 +469,7 @@ async function renderHome(filter = "all") {
   $("#grid").onclick = (e) => {
     const c = e.target.closest(".card"); if (!c) return;
     const a = state.artists[c.dataset.i];
-    if (isSheetId(a.url)) location.hash = "#/a/" + encodeURIComponent(a.name);
+    if (isSupportedTracker(a.url)) location.hash = "#/a/" + encodeURIComponent(a.name);
     else openExternal(/^https?:/.test(a.url) ? a.url : "https://" + a.url);
   };
   drawGrid();
@@ -463,7 +498,7 @@ function drawGrid() {
       <div class="badges">
         ${favs.has(a.name) ? '<span class="badge fav">♥</span>' : ""}
         ${a.best === "true" ? '<span class="badge">★</span>' : ""}
-        ${isSheetId(a.url) ? "" : '<span class="badge ext">↗</span>'}
+        ${isSupportedTracker(a.url) ? "" : '<span class="badge ext">↗</span>'}
       </div>
       <div class="name">${esc(a.name)}</div>
     </button>`).join("")
@@ -582,11 +617,12 @@ async function warmSearchIndex() {
     }
     for (const name of favs) {
       const a = state.artists.find((x) => x.name === name);
-      if (!a || !isSheetId(a.url) || !navigator.onLine) continue;
+      if (!a || !isSupportedTracker(a.url) || !navigator.onLine) continue;
       const rec = await idb.get(`ix:${a.url}:`);
       if (rec && Date.now() - rec.at < 864e5) continue;
       try {
-        const r = await cachedJson(TRACKER_API + `/sh/${a.url}/`, `t:${a.url}:`);
+        const key = trackerKey(a.url);
+        const r = await cachedJson(TRACKER_API + `/sh/${encodeURIComponent(key)}/`, `t:${a.url}:`);
         const d = r.data, tabName = (d.tabs || []).find((t) => t.slug === d.tab?.slug)?.name || d.tab?.name || "";
         const eras = normalizeEras(d, tabName);
         rememberEras(a.name, eras);
@@ -679,9 +715,13 @@ function rememberEras(artist, eras) {
   const m = (eraCovers[nameKey(artist)] ||= {});
   let changed = false;
   for (const e of eras) {
-    if (!e.cover_art) continue;
+    const cover = e.cover_art || e.era_logo || e.image || e.header_image;
+    if (!cover && !e.color) continue;
     for (const k of [nameKey(e.name), eraBase(e.name)]) {
-      if (k && !m[k]) { m[k] = { cover: e.cover_art, color: e.color }; changed = true; }
+      if (k && !m[k]) {
+        m[k] = { cover, color: e.color, text_color: e.text_color, font: e.font_family || e.font };
+        changed = true;
+      }
     }
   }
   if (changed) store("era_covers", eraCovers);
@@ -690,9 +730,13 @@ function fillEraCovers(artist, eras) {
   const m = eraCovers[nameKey(artist)] || {};
   let filled = 0;
   for (const e of eras) {
-    if (e.cover_art) continue;
     const hit = m[nameKey(e.name)] || m[eraBase(e.name)];
-    if (hit) { e.cover_art = hit.cover; e.color ||= hit.color; filled++; }
+    if (hit) {
+      if (!e.cover_art && hit.cover) { e.cover_art = hit.cover; filled++; }
+      e.color ||= hit.color;
+      e.text_color ||= hit.text_color;
+      e.font_family ||= hit.font;
+    }
   }
   return filled;
 }
@@ -714,7 +758,10 @@ async function renderArtist(name, tabSlug, eraName) {
   const ui = { q: "", f: "all", tab: tabSlug || "", openEra: eraName || "" };
 
   view.innerHTML = `
-    <div class="backdrop" aria-hidden="true">${imgTag(pic, false)}</div>
+    <div class="backdrop" aria-hidden="true">
+      <canvas id="artist-visualizer"></canvas>
+      ${imgTag(pic, false)}
+    </div>
     <div class="head artist-head">
       <div class="head-row">
         <div class="thumb avatar" style="${phStyle(a.name)}">${initial(a.name)}${imgTag(pic, false)}</div>
@@ -735,6 +782,11 @@ async function renderArtist(name, tabSlug, eraName) {
       <div class="chips sections" id="tabs"></div>
     </div>
     <div id="a-body"><div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div></div>`;
+
+  updateArtistVisualizer(a.name);
+  $(".avatar img")?.addEventListener("load", () => {
+    if (artistVisualizer && !settings.reduceMotion) updateArtistVisualizer(a.name);
+  });
 
   $("#a-share").onclick = () => shareArtist(a);
   const fav = $("#fav-toggle");
@@ -784,9 +836,10 @@ async function loadSection(a, ui) {
   const body = $("#a-body");
   const token = (ui.token = {});
   body.innerHTML = `<div class="state"><div class="spinner"></div>${esc(L("loadingTracker"))}</div>`;
-  const path = ui.tab ? `/sh/${a.url}/tab/${encodeURIComponent(ui.tab)}` : `/sh/${a.url}/`;
+  const key = trackerKey(a.url);
+  const path = ui.tab ? `/sh/${encodeURIComponent(key)}/tab/${encodeURIComponent(ui.tab)}` : `/sh/${encodeURIComponent(key)}/`;
   let res;
-  try { res = await cachedJson(TRACKER_API + path, "t:" + a.url + ":" + ui.tab); }
+  try { res = await cachedJson(TRACKER_API + path, "t:" + key + ":" + ui.tab); }
   catch {
     if (ui.token !== token || state.artistName !== a.name) return;
     $("#a-sub").textContent = "";
@@ -807,7 +860,7 @@ async function loadSection(a, ui) {
   // a side tab opened before the main one: load the main tab quietly to learn the era covers
   if (ui.tab && eras.some((e) => !e.cover_art) && !ui.mainLoaded) {
     ui.mainLoaded = true;
-    cachedJson(TRACKER_API + `/sh/${a.url}/`, "t:" + a.url + ":").then((r) => {
+    cachedJson(TRACKER_API + `/sh/${encodeURIComponent(key)}/`, "t:" + key + ":").then((r) => {
       rememberEras(a.name, normalizeEras(r.data));
       if (fillEraCovers(a.name, eras) && ui.token === token && !ui.q && ui.f === "all") ui.draw();
     }).catch(() => {});
@@ -834,17 +887,17 @@ async function loadSection(a, ui) {
     <div class="info-block">
       ${credits ? `<p>${esc(L("trackerBy", { c: credits }))}</p>` : ""}
       <div class="links-row">
-        <a class="pill-link" href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit" target="_blank" rel="noopener">Google Sheet ↗</a>
+        <a class="pill-link" href="${trackerExternalUrl(a.url)}" target="_blank" rel="noopener">${trackerExternalLabel(a.url)}</a>
         ${(d.discord || []).slice(0, 1).map((u) => `<a class="pill-link" href="${esc(u)}" target="_blank" rel="noopener">Discord ↗</a>`).join("")}
       </div>
     </div>
     <div id="list"></div>`;
 
-  // nothing readable in this tab: offer the same tab in the Google Sheet
+  // nothing readable in this tab: offer the same tab in the external source
   const gid = (d.tabs || []).find((t) => t.slug === curTab)?.gid ?? d.tab?.gid;
   const emptyTabHtml = () => `<div class="state">${esc(L("emptyTab"))}<br>
     <a class="btn ghost" style="display:inline-block;margin-top:14px;text-decoration:none" target="_blank" rel="noopener"
-      href="https://docs.google.com/spreadsheets/d/${esc(a.url)}/edit${gid != null ? "#gid=" + esc(gid) : ""}">${esc(L("openSheet"))} ↗</a></div>`;
+      href="${trackerExternalUrl(a.url, gid)}">${isSheetId(a.url) ? esc(L("openSheet")) + " ↗" : esc(trackerDomain(a.url)) + " ↗"}</a></div>`;
 
   const matches = ({ t, e }) => {
     const al = norm(t.available_length);
@@ -926,11 +979,59 @@ function trackListClick(ev) {
   else playItem(tr._item, tr.closest(".era-body, #list, .g-tracks"));
 }
 
+// ---------- custom era fonts (Coollabs Fonts) ----------
+const loadedFonts = new Set();
+function loadCoollabsFont(fontFamily) {
+  if (!fontFamily) return;
+  const first = fontFamily.split(",")[0].replace(/^docs-/i, "").replace(/["']/g, "").trim();
+  if (!first || first === "&quot" || loadedFonts.has(first)) return;
+  const standard = new Set([
+    "arial", "helvetica", "helvetica neue", "sans-serif", "serif", "monospace",
+    "times", "times new roman", "courier", "courier new", "verdana", "georgia",
+    "impact", "comic sans ms", "trebuchet ms", "tahoma"
+  ]);
+  if (standard.has(first.toLowerCase())) {
+    loadedFonts.add(first);
+    return;
+  }
+  loadedFonts.add(first);
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = `https://api.fonts.coollabs.io/css2?family=${encodeURIComponent(first.replace(/\s+/g, "+"))}:wght@400;600;700&display=swap`;
+  document.head.appendChild(link);
+}
+
+function eraFontFamily(e) {
+  const raw = e?.font_family || e?.font;
+  if (!raw) return "";
+  const clean = raw.split(",")[0].replace(/^docs-/i, "").replace(/["']/g, "").trim();
+  if (!clean || clean === "&quot") return "";
+  loadCoollabsFont(clean);
+  return `"${clean}", sans-serif`;
+}
+
+function eraCardStyle(e) {
+  const props = [];
+  const color = e.color && /^#[0-9a-f]{3,8}$/i.test(e.color) ? e.color : null;
+  if (color) {
+    // Subtle tint over the card surface instead of solid color; do not tint borders
+    props.push(`--era-bg:color-mix(in srgb, ${color} 14%, var(--surface))`);
+    const txt = e.text_color && /^#[0-9a-f]{3,8}$/i.test(e.text_color)
+      ? e.text_color
+      : `color-mix(in srgb, ${color} 75%, var(--text))`;
+    props.push(`--era-title-color:${txt}`);
+  }
+  const font = eraFontFamily(e);
+  if (font) props.push(`--era-font:${font}`);
+  return props.join(";");
+}
+
 function eraHtml(e, artist) {
   const s = e.stats;
   const sum = s ? [s.og_file && `${s.og_file} OG`, s.full && `${s.full} full`, s.snippet && `${s.snippet} snippet`].filter(Boolean).join(" · ") : "";
+  const st = eraCardStyle(e);
   return `
-    <div class="era" data-e="${e.i}">
+    <div class="era" data-e="${e.i}" ${st ? `style="${st}"` : ""}>
       <button class="era-head" aria-expanded="false">
         <div class="thumb" style="${phStyle(e.name, e.color)}">${initial(e.name)}${imgTag(eraImgs(e, artist))}</div>
         <div class="t"><b>${esc(e.name)}</b><span>${L("nTracks", { n: e.tracks.length })}${sum ? " · " + sum : ""}</span></div>
@@ -1110,7 +1211,8 @@ function shareTrack(it) {
   shareText(title, [`${title}`, `${it.artist} · ${it.e.name}`, link, "", L("shareFrom")].filter((x, i) => x || i === 3).join("\n"));
 }
 function shareArtist(a) {
-  shareText(a.name, [L("shareArtistText", { a: a.name }), `https://docs.google.com/spreadsheets/d/${a.url}`, "", L("shareFrom")].join("\n"));
+  const link = isSheetId(a.url) ? `https://docs.google.com/spreadsheets/d/${a.url}` : `https://${trackerDomain(a.url)}`;
+  shareText(a.name, [L("shareArtistText", { a: a.name }), link, "", L("shareFrom")].join("\n"));
 }
 
 // ---------- native bridge (Android only) ----------
@@ -1352,7 +1454,11 @@ function startCurrent(direct = false, autoplay = true, seek = 0) {
 function prefetchCovers() {
   for (const it of state.queue.slice(state.qIndex + 1, state.qIndex + 4)) {
     const first = candidates(eraImgs(it.e, it.artist))[0];
-    if (first && !first.startsWith("lookup:")) new Image().src = first;
+    if (first && !first.startsWith("lookup:")) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = first;
+    }
   }
 }
 
@@ -1473,12 +1579,14 @@ for (const el of [audioFx, audioRaw]) {
     if (el !== audio) return;
     playIcon.setAttribute("d", PAUSE_D); $("#np-play-icon").setAttribute("d", PAUSE_D);
     document.body.classList.add("is-playing");
+    if (npIsOpen() && visualizer && !settings.reduceMotion) visualizer.start();
     syncNative();
   };
   el.onpause = () => {
     if (el !== audio) return;
     playIcon.setAttribute("d", PLAY_D); $("#np-play-icon").setAttribute("d", PLAY_D);
     document.body.classList.remove("is-playing");
+    if (visualizer) visualizer.stop();
     syncNative();
     saveSession();
   };
@@ -1545,6 +1653,10 @@ function openNowPlaying() {
   history.pushState({ np: 1 }, "", location.href);
   showOutput(lastOutput);
   native("getOutput").then((o) => o && showOutput(o));
+  if (visualizer) {
+    visualizer.resize();
+    if (!audio.paused && !settings.reduceMotion) visualizer.start();
+  }
 }
 // Resolves once the player is closed and history is back where it was.
 function closeNowPlaying() {
@@ -1563,6 +1675,7 @@ function hideNowPlaying() {
   np.style.transform = "";
   np.setAttribute("aria-hidden", "true");
   document.body.classList.remove("np-open");
+  if (visualizer) visualizer.stop();
 }
 window.addEventListener("popstate", () => { if (npIsOpen() && !history.state?.np) hideNowPlaying(); });
 
@@ -1585,6 +1698,7 @@ function renderNowPlaying() {
   updateSeek();
   renderQueue();
   loadLyrics(it);
+  updateVisualizer(it);
 }
 // ---------- dynamic colour from the cover ----------
 // Like Spotify, the full-screen player (and its lyrics card) takes its colour from the album
@@ -1627,6 +1741,13 @@ let tintFor = null;
 function tintFromCover() {
   const img = $("#np-cover"), it = cur();
   if (!it || tintFor !== it) return;
+  if (visualizer && !settings.reduceMotion && img.naturalWidth) {
+    try {
+      visualizer.loadImageElement(img);
+      $("#np-visualizer")?.classList.add("active");
+      if (!audio.paused && npIsOpen()) visualizer.start();
+    } catch {}
+  }
   setTint(coverColor(img) || eraTint(it.e));
 }
 // before (or without) a readable cover: the era's own colour from the tracker, if it has one
@@ -1635,6 +1756,136 @@ function eraTint(e) {
   return m ? rgbToHsl(hexRgb("#" + m[1])) : null;
 }
 $("#np-cover").addEventListener("load", tintFromCover);
+$("#np-cover")?.addEventListener("error", () => {
+  if (visualizer && !settings.reduceMotion) loadVisualizerGradient(cur());
+});
+
+// ---------- Kawarp fluid visualizer ----------
+let visualizer = null;
+function initVisualizer() {
+  if (visualizer || typeof Kawarp === "undefined") return;
+  const canvas = $("#np-visualizer");
+  if (!canvas) return;
+  try {
+    visualizer = new Kawarp(canvas, {
+      warpIntensity: 0.85,
+      blurPasses: 8,
+      animationSpeed: 1.0,
+      saturation: 1.4,
+      tintColor: [0.1, 0.1, 0.14],
+      tintIntensity: 0.2,
+      scale: 1.0,
+    });
+  } catch (err) {
+    console.warn("Kawarp initialization failed:", err);
+  }
+}
+
+function updateVisualizer(it) {
+  if (!it) return;
+  initVisualizer();
+  if (!visualizer) return;
+  const canvas = $("#np-visualizer");
+  if (settings.reduceMotion) {
+    visualizer.stop();
+    canvas?.classList.remove("active");
+    return;
+  }
+  const coverImg = $("#np-cover");
+  if (coverImg && coverImg.classList.contains("loaded") && coverImg.naturalWidth) {
+    try {
+      visualizer.loadImageElement(coverImg);
+      canvas?.classList.add("active");
+      if (!audio.paused && npIsOpen()) visualizer.start();
+      return;
+    } catch {}
+  }
+  loadVisualizerGradient(it);
+}
+
+function loadVisualizerGradient(it) {
+  if (!visualizer) return;
+  const col = it?.e?.color && /^#[0-9a-f]{3,8}$/i.test(it.e.color) ? it.e.color : null;
+  const colors = col ? [col, "#111116"] : ["#3d2b5c", "#120f1f"];
+  try {
+    visualizer.loadGradient(colors, 135);
+    $("#np-visualizer")?.classList.add("active");
+    if (!audio.paused && npIsOpen()) visualizer.start();
+  } catch {}
+}
+
+let artistVisualizer = null;
+function initArtistVisualizer() {
+  const canvas = $("#artist-visualizer");
+  if (!canvas || typeof Kawarp === "undefined") return;
+  try {
+    if (artistVisualizer) {
+      artistVisualizer.dispose();
+      artistVisualizer = null;
+    }
+    artistVisualizer = new Kawarp(canvas, {
+      warpIntensity: 0.8,
+      blurPasses: 8,
+      animationSpeed: 0.75,
+      saturation: 1.35,
+      tintColor: [0.1, 0.1, 0.14],
+      tintIntensity: 0.2,
+      scale: 1.0,
+    });
+  } catch (err) {
+    console.warn("Artist visualizer init failed:", err);
+  }
+}
+
+function updateArtistVisualizer(artistName, color) {
+  initArtistVisualizer();
+  if (!artistVisualizer) return;
+  const canvas = $("#artist-visualizer");
+  if (settings.reduceMotion) {
+    artistVisualizer.stop();
+    canvas?.classList.remove("active");
+    return;
+  }
+  const avatarImg = $(".avatar img");
+  if (avatarImg && avatarImg.classList.contains("loaded") && avatarImg.naturalWidth) {
+    try {
+      artistVisualizer.loadImageElement(avatarImg);
+      canvas?.classList.add("active");
+      if (!settings.reduceMotion) artistVisualizer.start();
+      return;
+    } catch {}
+  }
+  const imgs = artistImgs(artistName);
+  const first = candidates(imgs)[0];
+  if (first && !first.startsWith("lookup:") && !first.startsWith("data:")) {
+    artistVisualizer.loadImage(first)
+      .then(() => {
+        canvas?.classList.add("active");
+        if (!settings.reduceMotion) artistVisualizer.start();
+      })
+      .catch(() => {
+        loadArtistVisualizerGradient(artistName, color);
+      });
+  } else {
+    loadArtistVisualizerGradient(artistName, color);
+  }
+}
+
+function loadArtistVisualizerGradient(artistName, color) {
+  if (!artistVisualizer) return;
+  let h = 0; for (const c of String(artistName)) h = (h * 31 + c.charCodeAt(0)) % 360;
+  const col = color || `hsl(${h} 40% 22%)`;
+  try {
+    artistVisualizer.loadGradient([col, "#111116"], 135);
+    $("#artist-visualizer")?.classList.add("active");
+    if (!settings.reduceMotion) artistVisualizer.start();
+  } catch {}
+}
+
+window.addEventListener("resize", () => {
+  if (visualizer && npIsOpen()) visualizer.resize();
+  if (artistVisualizer) artistVisualizer.resize();
+});
 
 // ---------- lyrics ----------
 // Looked up on LRCLIB (free, open lyrics database) by title and artist. Leaks often differ from
@@ -1687,15 +1938,19 @@ function showLyricsState(msg, cls = "") {
 async function loadLyrics(it) {
   if (ly.it === it) return;
   ly.it = it; ly.cur = -1; ly.res = null;
-  lyEl.hidden = false;
+  ly.lines = null;
+  lyEl.hidden = true;
   lyEl.classList.remove("synced");
-  showLyricsState(`<div class="spinner small"></div>${esc(L("lyricsLoading"))}`, "loading");
+  if (lyEl.classList.contains("full")) closeLyrics();
   let res = null;
   try { res = await findLyrics(it); } catch { res = undefined; }
   if (ly.it !== it) return; // the track changed meanwhile
-  if (res === undefined) return showLyricsState(esc(L("lyricsError")));
-  if (!res || res.instrumental) return showLyricsState(esc(L(res?.instrumental ? "lyricsInstrumental" : "lyricsNone")));
+  if (!res || res.instrumental || (!res.plain && !res.synced)) {
+    lyEl.hidden = true;
+    return;
+  }
   ly.res = res;
+  lyEl.hidden = false;
   renderLyrics(it);
 }
 function renderLyrics(it) {
@@ -2127,7 +2382,7 @@ function titleTapped() {
 function startDvd() {
   if ($("#dvd")) return;
   // famous artists with a tracker in the app (not the entries that point to an external site)
-  const pool = state.artists.filter((a) => a.best === "true" && isSheetId(a.url));
+  const pool = state.artists.filter((a) => a.best === "true" && isSupportedTracker(a.url));
   const a = (pool.length ? pool : state.artists)[Math.floor(Math.random() * (pool.length || state.artists.length))];
   if (!a) return;
   haptic(30);
@@ -2181,6 +2436,11 @@ function openExternal(url) {
 
 // ---------- router ----------
 function route() {
+  if (artistVisualizer) {
+    artistVisualizer.stop();
+    artistVisualizer.dispose();
+    artistVisualizer = null;
+  }
   const h = location.hash.replace(/^#\/?/, "");
   const parts = h.split("/").map(decodeURIComponent);
   if (!document.body.classList.contains("in-sub") && view.querySelector("#grid")) state.homeScroll = { filter: state.filter, y: window.scrollY };

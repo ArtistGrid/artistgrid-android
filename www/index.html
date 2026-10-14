@@ -25,7 +25,7 @@
 
   <div id="player" class="glass" hidden>
     <div class="p-row">
-      <div class="thumb" id="p-thumb"><img id="p-cover" alt="" /></div>
+      <div class="thumb" id="p-thumb"><img id="p-cover" alt="" crossorigin="anonymous" /></div>
       <button class="p-meta" id="p-open">
         <div id="p-title" class="marquee"></div>
         <div id="p-sub"></div>
@@ -66,14 +66,17 @@
   </nav>
 
   <section id="np" class="np" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="np-bg"><img id="np-bg-img" alt="" /></div>
+    <div class="np-bg">
+      <img id="np-bg-img" alt="" crossorigin="anonymous" />
+      <canvas id="np-visualizer"></canvas>
+    </div>
     <div class="np-scroll" id="np-scroll">
       <header class="np-top" id="np-grab">
         <button id="np-close" class="icon-btn" data-i18n-aria="close"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="np-from"><small data-i18n="playingFrom"></small><b id="np-era"></b></div>
         <button id="np-go-artist" class="icon-btn" data-i18n-aria="openArtist"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button>
       </header>
-      <div class="np-cover thumb" id="np-thumb"><img id="np-cover" alt="" /></div>
+      <div class="np-cover thumb" id="np-thumb"><img id="np-cover" alt="" crossorigin="anonymous" /></div>
       <div class="np-meta">
         <div class="txt">
           <h2 id="np-title" class="marquee"></h2>
@@ -115,6 +118,7 @@
 
   <div id="toast" class="glass" hidden></div>
 
+  <script src="kawarp.js"></script>
   <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>

@@ -1,16 +1,18 @@
-name: Build APK
+name: Build
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 1.1.0). Leave empty to only build the APK."
+        description: "Release version (e.g. 1.1.0). Leave empty to only build the apps."
         required: false
         default: ""
 
 jobs:
-  build:
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,11 +66,67 @@ jobs:
           name: ArtistGrid-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-  # Run manually (Actions → Build APK → Run workflow) with a version such as 1.1.0
-  # to publish a GitHub release with the APK attached.
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check the release version
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must look like 1.5.1 (got '$VERSION')"; exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync web assets into the iOS project
+        run: npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios/App
+        run: pod install
+
+      - name: Build iOS app
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Package unsigned IPA
+        working-directory: ios/App/build/Build/Products/Debug-iphoneos
+        run: |
+          mkdir -p Payload
+          cp -r App.app Payload/
+          zip -r ArtistGrid.ipa Payload
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArtistGrid-ipa
+          path: ios/App/build/Build/Products/Debug-iphoneos/ArtistGrid.ipa
+
+  # Run manually (Actions → Build → Run workflow) with a version such as 1.1.0
+  # to publish a GitHub release with the APK and IPA attached.
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.version != ''
-    needs: build
+    needs: [build-android, build-ios]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -79,13 +137,17 @@ jobs:
         with:
           name: ArtistGrid-apk
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: ArtistGrid-ipa
+
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
           mv app-debug.apk ArtistGrid.apk
-          gh release create "v$VERSION" ArtistGrid.apk \
+          gh release create "v$VERSION" ArtistGrid.apk ArtistGrid.ipa \
             --target "$GITHUB_SHA" \
             --title "ArtistGrid v$VERSION" \
             --notes-file .github/release-notes.md

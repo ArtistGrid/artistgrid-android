@@ -20,7 +20,7 @@ Audio and covers that fail to load directly are requested through `/_proxy?u=<ur
 
 ## Builds and releases
 
-Every push builds a debug APK with GitHub Actions (`.github/workflows/build-apk.yml`). Running the workflow manually with a version (e.g. `1.2.0`) also publishes a GitHub release with `ArtistGrid.apk` and the notes in `.github/release-notes.md`; the app's update check reads the latest release.
+Every push builds the Android APK and iOS app with GitHub Actions (`.github/workflows/build.yml`). Running the workflow manually with a version (e.g. `1.2.0`) also publishes a GitHub release with `ArtistGrid.apk` and `ArtistGrid.ipa` and the notes in `.github/release-notes.md`; the app's update check reads the latest release.
 
 To sign every build with the same key (so new versions install as updates), add these repository secrets:
 
@@ -34,6 +34,7 @@ Create a keystore with `keytool -genkeypair -keystore my.keystore -alias artistg
 
 ## Building from source
 
+### Android
 Requirements: Node.js 18+, JDK 21, Android SDK (platform 35, build-tools 35).
 
 ```bash
@@ -44,6 +45,17 @@ cd android
 ```
 
 The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### iOS
+Requirements: macOS, Node.js 18+, Xcode, CocoaPods.
+
+```bash
+npm install
+npx cap sync ios
+cd ios/App
+pod install
+xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO clean build
+```
 
 > On Windows, Gradle can fail if the project sits in a very long path. If that happens, move it to a short folder such as `C:\dev\artistgrid-android`.
 
